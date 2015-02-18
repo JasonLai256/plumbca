@@ -10,10 +10,9 @@
 import pytest
 
 from plumbca.helpers import find_ge, find_lt, find_eq
-from data import metadata_t
 
 
-def test_find_func():
+def test_find_func(metadata_t):
     '''testing the helper functions that using bisect mosule.'''
     # [1] ->
     item = [143373]

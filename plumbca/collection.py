@@ -11,6 +11,7 @@
 
 from bisect import insort
 from threading import Lock
+import time
 import os
 
 from .config import DefaultConf
@@ -45,9 +46,6 @@ class Collection(object):
     def info(self):
         raise NotImplementedError
 
-    def varify_expire(self):
-        raise NotImplementedError
-
 
 class IncreseCollection(Collection):
     """Collection for store and cache the dict-like JSON data, and will be sorted
@@ -58,7 +56,6 @@ class IncreseCollection(Collection):
         super().__init__(name)
         self._metadata = []
         self.caching = {}
-        self.expired = {}
         self.md_lock = Lock()
         self.ca_lock = Lock()
         self._info = {}
@@ -74,7 +71,6 @@ class IncreseCollection(Collection):
                 self.name,
                 self._metadata,
                 self.caching,
-                self.expired,
             ]
             f.write(msgpack.packb(_tmp))
 
@@ -83,22 +79,38 @@ class IncreseCollection(Collection):
         fpath = os.path.join(DefaultConf.get('dumpdir'), fname)
         with open(fpath, 'rb') as f:
             _tmp = msgpack.unpackb(f.read(), encoding='utf-8')
+            if _tmp[0] != self.name:
+                return
             self._metadata = _tmp[1]
             self.caching = _tmp[2]
-            self.expired = _tmp[3]
 
-    def fetch_expired(self):
+    def fetch_expired(self, d=True):
+        """Fetch the expired data from the store, there will delete the returned
+        items by default.
+
+        :param d: whether delete the returned items.
+        """
         rv = []
-        with self.ca_lock.acquire():
-            for key in self.expired:
-                item = key.split(',') + [self.expired[key]]
-                rv.append(item)
-                # remove metadata of the item
-                index = self.metadata_exists(item[0], item[1], True)
-                del self._metadata[index]
+        indexes = []
+        with self.md_lock, self.ca_lock:
+            now = time.time()
+            for i, mdata in enumerate(self._metadata):
+                if now > mdata[-1]:
+                    key = self.gen_key_name(mdata[0], mdata[1])
+                    item = key.split(',') + [self.caching[key]]
+                    rv.append(item)
+                    if d:
+                        del self.caching[key]
+                        indexes.append(i)
+
+            # remove all the expired metadata from the self._metadata and the self.caching
+            if d and indexes:
+                for index in reversed(indexes):
+                    del self._metadata[index]
+
         return rv
 
-    def query(self, stime, etime, expire_only=False):
+    def query(self, stime, etime):
         if stime > etime:
             return
         start, end = self.ensure_index_range(stime, etime)
@@ -108,17 +120,7 @@ class IncreseCollection(Collection):
         rv = []
         for mdata in self._metadata[start:end]:
             key = self.gen_key_name(mdata[0], mdata[1])
-            if expire_only:
-                if key in self.expired:
-                    item = key.split(',') + [self.expired[key]]
-                else:
-                    continue
-            else:
-                if key in self.expired:
-                    item = key.split(',') + [self.expired[key]]
-                else:
-                    item = key.split(',') + [self.caching[key]]
-
+            item = key.split(',') + [self.caching[key]]
             rv.append(item)
 
         return rv
@@ -136,6 +138,7 @@ class IncreseCollection(Collection):
         if not isinstance(value, dict):
             raise ValueError('The IncreseCollection only accept Dict type value.')
         ts = int(ts)
+        expire = int(time.time()) + expire
         mdata = [ts, tagging, expire]
         keyname = self.update_matadata(mdata)
         self.update_value(keyname, value)
@@ -147,7 +150,7 @@ class IncreseCollection(Collection):
         if key in self.caching:
             cache_item = self.caching[key]
         else:
-            cache_item = self.expired[key]
+            raise ValueError('The key ({}) not in caching store.'.format(key))
 
         for k, v in value.items():
             if k in cache_item:
