@@ -6,7 +6,7 @@
 
 from configparser import ConfigParser
 
-from .exception import PlumbcaConfigNotFound
+from .exceptions import PlumbcaConfigNotFound
 
 
 defaults = {

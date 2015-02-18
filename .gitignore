@@ -1,4 +1,6 @@
 *.py[co]
 *~
 devnote.rst
-*test*
+*test.py*
+.coverage
+plumbca.egg-info
