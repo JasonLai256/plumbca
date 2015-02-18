@@ -4,3 +4,4 @@ devnote.rst
 *test.py*
 .coverage
 plumbca.egg-info
+.tox
