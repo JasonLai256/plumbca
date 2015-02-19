@@ -119,3 +119,27 @@ def test_increse_collection_dump_load(icoll, icoll2, tmpdir):
     icoll2.load()
     assert icoll._metadata == icoll2._metadata
     assert icoll.caching == icoll2.caching
+
+
+@pytest.mark.incremental
+def test_increse_collection_batch_opes(icoll, icoll2, tmpdir):
+    from plumbca.config import DefaultConf
+    DefaultConf['dumpdir'] = str(tmpdir)
+
+    tslist, tagging = CollOpeHelper.icoll_insert_data(icoll)
+    for i in range(8192):
+        t = 'test{}'.format(i)
+        CollOpeHelper.icoll_insert_data(icoll, t)
+        assert len(icoll.query(10, 1000, tagging))
+        assert tagging in icoll._metadata
+        assert len(icoll._metadata[t]) == len(tslist)
+        assert len(icoll.caching) == len(tslist) * (i + 2)
+
+        assert icoll._metadata[tagging][0][:1] == [min(tslist)]
+        assert icoll._metadata[tagging][-1][:1] == [max(tslist)]
+
+    icoll.dump()
+    icoll2.name = 'foo'
+    icoll2.load()
+    assert icoll._metadata == icoll2._metadata
+    assert icoll.caching == icoll2.caching
