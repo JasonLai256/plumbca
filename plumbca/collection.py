@@ -47,7 +47,7 @@ class Collection(object):
         raise NotImplementedError
 
 
-class IncreseCollection(Collection):
+class IncreaseCollection(Collection):
     """Collection for store and cache the dict-like JSON data, and will be sorted
     by tiem-series.
     """
@@ -153,7 +153,7 @@ class IncreseCollection(Collection):
 
     def store(self, ts, tagging, value, expire=300):
         if not isinstance(value, dict):
-            raise ValueError('The IncreseCollection only accept Dict type value.')
+            raise ValueError('The IncreaseCollection only accept Dict type value.')
         ts = int(ts)
         expire = int(time.time()) + expire
         mdata = [ts, expire]
