@@ -12,7 +12,7 @@
 import logging.config
 import logging
 
-from config import DefaultConf
+from .config import DefaultConf
 
 
 LOGGING = {
@@ -34,7 +34,7 @@ LOGGING = {
         'console': {
             'level': 'DEBUG',
             'class': 'logging.StreamHandler',
-            'formatter': 'debug'
+            'formatter': 'simple'
         },
         'activity_rotating_file': {
             'level': 'DEBUG',
@@ -55,12 +55,12 @@ LOGGING = {
     },
     'loggers': {
         'activity': {
-            'handlers': ['console', 'activity_rotating_file'],
+            'handlers': ['console', 'activity_rotating_file'] if DefaultConf.get('debug', '') == 'yes' else ['activity_rotating_file'],
             'propagate': True,
             'level': 'INFO',
         },
         'errors': {
-            'handlers': ['console', 'errors_rotating_file'],
+            'handlers': ['console', 'errors_rotating_file'] if DefaultConf.get('debug', '') == 'yes' else ['errors_rotating_file'],
             'level': 'ERROR',
             'propagate': False,
         }

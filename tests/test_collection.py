@@ -87,17 +87,19 @@ def test_increse_collection_fetch_expired(icoll):
     tag_list = ['foo', 'bar', 'bin', 'jack', 'bob', 'sys', 'usr', 'var', 'etc']
     for i, t in enumerate(tag_list, 1):
         tslist, tagging = CollOpeHelper.icoll_insert_data(icoll, t)
-        rv = icoll.fetch_expired(d=False)
+        rv = icoll.fetch_expired(tagging=tagging, d=False)
         assert len(rv) == 2
         assert rv[0][:1] == ['108']
         assert rv[1][:1] == ['188']
         assert len(icoll.query(10, 1000, tagging)) == 5
 
-        rv = icoll.fetch_expired()
-        assert len(rv) == 2
-        assert rv[0][:1] == ['108']
-        assert rv[1][:1] == ['188']
-        assert len(icoll.query(10, 1000, tagging)) == 3
+    rv = icoll.fetch_expired(d=False)
+    assert len(rv) == 2 * i
+    assert len(icoll.caching) == 5 * i
+
+    rv = icoll.fetch_expired()
+    assert len(rv) == 2 * i
+    assert len(icoll.caching) == 3 * i
 
 
 @pytest.mark.incremental
@@ -127,7 +129,7 @@ def test_increse_collection_batch_opes(icoll, icoll2, tmpdir):
     DefaultConf['dumpdir'] = str(tmpdir)
 
     tslist, tagging = CollOpeHelper.icoll_insert_data(icoll)
-    for i in range(8192):
+    for i in range(1024):
         t = 'test{}'.format(i)
         CollOpeHelper.icoll_insert_data(icoll, t)
         assert len(icoll.query(10, 1000, tagging))

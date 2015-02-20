@@ -16,15 +16,20 @@ from .exceptions import PlumbcaConfigNotFound
 
 defaults = {
     'global': {
+        'debug': '',
         'daemonize': 'no',
         'pidfile': '/var/run/plumbca.pid',
         'bind': '127.0.0.1',
         'port': '4273',
+        'transport': 'tcp',
+        'unixsocket': '',
         'logfile': '/var/log/plumbca.log',
         'dumpfilename': 'dump.save',
         'dumpdir': '/var/lib/plumbca/',
         'activity_log': '/var/log/plumbca/plumbca.log',
         'errors_log': '/var/log/plumbca/plumbca_errors.log',
+        # 'activity_log': 'plumbca_activity.log',
+        # 'errors_log': 'plumbca_errors.log',
     },
 }
 
