@@ -83,23 +83,36 @@ def test_increse_collection_query(icoll):
 
 
 @pytest.mark.incremental
-def test_increse_collection_fetch_expired(icoll):
+def test_increse_collection_fetch(icoll):
     tag_list = ['foo', 'bar', 'bin', 'jack', 'bob', 'sys', 'usr', 'var', 'etc']
     for i, t in enumerate(tag_list, 1):
         tslist, tagging = CollOpeHelper.icoll_insert_data(icoll, t)
-        rv = icoll.fetch_expired(tagging=tagging, d=False)
+        rv = icoll.fetch(tagging=tagging, d=False)
         assert len(rv) == 2
         assert rv[0][:1] == ['108']
         assert rv[1][:1] == ['188']
         assert len(icoll.query(10, 1000, tagging)) == 5
 
-    rv = icoll.fetch_expired(d=False)
-    assert len(rv) == 2 * i
-    assert len(icoll.caching) == 5 * i
+        rv = icoll.fetch(tagging=tagging, d=False, e=False)
+        assert len(rv) == 5
 
-    rv = icoll.fetch_expired()
+    rv = icoll.fetch(d=False)
+    assert len(rv) == 2 * i
+
+    rv = icoll.fetch(d=False, e=False)
+    assert len(rv) == 5 * i
+    assert len(icoll.caching) == 5 * i
+    assert sum(len(mdata) for mdata in icoll._metadata.values()) == 5 * i
+
+    rv = icoll.fetch()
     assert len(rv) == 2 * i
     assert len(icoll.caching) == 3 * i
+    assert sum(len(mdata) for mdata in icoll._metadata.values()) == 3 * i
+
+    rv = icoll.fetch(e=False)
+    assert len(rv) == 3 * i
+    assert len(icoll.caching) == 0
+    assert sum(len(mdata) for mdata in icoll._metadata.values()) == 0
 
 
 @pytest.mark.incremental

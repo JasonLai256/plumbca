@@ -34,7 +34,7 @@ class Collection(object):
     def store(self, ts, tagging, value):
         raise NotImplementedError
 
-    def fetch_expired(self):
+    def fetch(self):
         raise NotImplementedError
 
     def dump(self, fpath):
@@ -84,12 +84,13 @@ class IncreaseCollection(Collection):
             self._metadata = _tmp[1]
             self.caching = _tmp[2]
 
-    def fetch_expired(self, tagging='__all__', d=True):
+    def fetch(self, tagging='__all__', d=True, e=True):
         """Fetch the expired data from the store, there will delete the returned
         items by default.
 
-        :param tagging:
+        :param tagging: specific tagging value for the collection
         :param d: whether delete the returned items.
+        :param e: only fetch expired data if True.
         """
         if tagging != '__all__' and tagging not in self._metadata:
             return
@@ -99,10 +100,11 @@ class IncreaseCollection(Collection):
             now = time.time()
             if tagging == '__all__':
                 for t in self._metadata:
-                    _res = self._fetch_expired(now, t, d)
+                    _res = self._fetch_expired(now, t, d) if e else self._fetch_all(t, d)
                     rv.extend(_res)
             else:
-                _res = self._fetch_expired(now, tagging, d)
+                t = tagging
+                _res = self._fetch_expired(now, t, d) if e else self._fetch_all(t, d)
                 rv.extend(_res)
 
         return rv
@@ -123,6 +125,23 @@ class IncreaseCollection(Collection):
         # remove all the expired metadata from the self._metadata and the self.caching
         if d and indexes:
             for index in reversed(indexes):
+                del metadata[index]
+
+        return rv
+
+    def _fetch_all(self, tagging, d):
+        rv = []
+        metadata = self._metadata[tagging]
+        for mdata in metadata:
+            key = self.gen_key_name(mdata[0], tagging)
+            item = key.split(',') + [self.caching[key]]
+            rv.append(item)
+            if d:
+                del self.caching[key]
+
+        # remove all the metadata from the self._metadata and the self.caching
+        if d:
+            for index in reversed(range(len(metadata))):
                 del metadata[index]
 
         return rv
