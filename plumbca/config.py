@@ -28,8 +28,6 @@ defaults = {
         'dumpdir': '/var/lib/plumbca/',
         'activity_log': '/var/log/plumbca/plumbca.log',
         'errors_log': '/var/log/plumbca/plumbca_errors.log',
-        # 'activity_log': 'plumbca_activity.log',
-        # 'errors_log': 'plumbca_errors.log',
     },
 }
 

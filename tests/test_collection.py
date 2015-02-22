@@ -127,6 +127,8 @@ def test_increse_collection_dump_load(icoll, icoll2, tmpdir):
 
     assert icoll.itype == 'inc'
     assert icoll2.itype == 'max'
+    assert str(icoll) == '<IncreaseCollection> - foo'
+    assert str(icoll2) == '<IncreaseCollection> - bar'
 
     CollOpeHelper.icoll_insert_data(icoll)
     icoll.dump()

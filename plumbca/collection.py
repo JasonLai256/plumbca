@@ -26,6 +26,12 @@ class Collection(object):
         self.lock = Lock()
         self.name = name
 
+    def __repl__(self):
+        return '<{}> - {}'.format(self.__class__.__name__, self.name)
+
+    def __str__(self):
+        return self.__repl__()
+
     def query(self, stime, etime, tagging):
         """Provide query API with time ranges parameter.
         """
