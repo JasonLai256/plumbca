@@ -11,7 +11,7 @@ setup(
         'msgpack-python',
     ],
     packages=find_packages(exclude=["tests"]),
-    license='MIT',
+    license='BSD',
     author='Jason Lai',
     author_email='jasonlai256@gmail.com',
     description='.',
