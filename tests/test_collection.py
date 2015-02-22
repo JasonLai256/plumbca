@@ -121,10 +121,7 @@ def test_increse_collection_fetch(icoll):
 
 
 @pytest.mark.incremental
-def test_increse_collection_dump_load(icoll, icoll2, tmpdir):
-    from plumbca.config import DefaultConf
-    DefaultConf['dumpdir'] = str(tmpdir)
-
+def test_increse_collection_dump_load(icoll, icoll2):
     assert icoll.itype == 'inc'
     assert icoll2.itype == 'max'
     assert str(icoll) == '<IncreaseCollection> - foo'
@@ -151,10 +148,7 @@ def test_increse_collection_dump_load(icoll, icoll2, tmpdir):
 
 
 @pytest.mark.incremental
-def test_increse_collection_batch_opes(icoll, icoll2, tmpdir):
-    from plumbca.config import DefaultConf
-    DefaultConf['dumpdir'] = str(tmpdir)
-
+def test_increse_collection_batch_opes(icoll, icoll2):
     tslist, tagging = CollOpeHelper.icoll_insert_data(icoll)
     for i in range(1024):
         t = 'test{}'.format(i)

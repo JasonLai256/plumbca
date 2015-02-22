@@ -23,8 +23,6 @@ defaults = {
         'port': '4273',
         'transport': 'tcp',
         'unixsocket': '',
-        'logfile': '/var/log/plumbca.log',
-        'dumpfilename': 'dump.save',
         'dumpdir': '/var/lib/plumbca/',
         'activity_log': '/var/log/plumbca/plumbca.log',
         'errors_log': '/var/log/plumbca/plumbca_errors.log',
