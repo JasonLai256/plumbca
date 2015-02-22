@@ -52,13 +52,22 @@ class IncreaseCollection(Collection):
     by tiem-series.
     """
 
-    def __init__(self, name):
+    opes = {
+        'inc': lambda x, y: x + y,
+        'avg': lambda x, y: (x + y) / 2,
+        'max': lambda x, y: max(x, y),
+        'min': lambda x, y: min(x, y),
+    }
+
+    def __init__(self, name, itype='inc'):
         super().__init__(name)
         self._metadata = {}
         self.caching = {}
         self.md_lock = Lock()
         self.ca_lock = Lock()
         self._info = {}
+        self.itype = itype
+        self.ifunc = self.opes[itype]
 
     def info(self):
         return self._info
@@ -69,6 +78,7 @@ class IncreaseCollection(Collection):
         with open(fpath, 'wb') as f:
             _tmp = [
                 self.name,
+                self.itype,
                 self._metadata,
                 self.caching,
             ]
@@ -81,8 +91,10 @@ class IncreaseCollection(Collection):
             _tmp = msgpack.unpackb(f.read(), encoding='utf-8')
             if _tmp[0] != self.name:
                 return
-            self._metadata = _tmp[1]
-            self.caching = _tmp[2]
+            self.itype = _tmp[1]
+            self.ifunc = self.opes[self.itype]
+            self._metadata = _tmp[2]
+            self.caching = _tmp[3]
 
     def fetch(self, tagging='__all__', d=True, e=True):
         """Fetch the expired data from the store, there will delete the returned
@@ -190,7 +202,7 @@ class IncreaseCollection(Collection):
 
         for k, v in value.items():
             if k in cache_item:
-                cache_item[k] += int(v)
+                cache_item[k] = self.ifunc(cache_item[k], int(v))
             else:
                 cache_item[k] = int(v)
 

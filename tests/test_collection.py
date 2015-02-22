@@ -60,6 +60,11 @@ def test_increse_collection_store(icoll):
 
 
 @pytest.mark.incremental
+def test_increse_collection_store_other_opes(icoll):
+    pass
+
+
+@pytest.mark.incremental
 def test_increse_collection_query(icoll):
     tag_list = ['foo', 'bar', 'bin', 'jack', 'bob', 'sys', 'usr', 'var', 'etc']
     for i, t in enumerate(tag_list, 1):
@@ -120,12 +125,17 @@ def test_increse_collection_dump_load(icoll, icoll2, tmpdir):
     from plumbca.config import DefaultConf
     DefaultConf['dumpdir'] = str(tmpdir)
 
+    assert icoll.itype == 'inc'
+    assert icoll2.itype == 'max'
+
     CollOpeHelper.icoll_insert_data(icoll)
     icoll.dump()
-    icoll2.name = 'foo'
+    icoll2.name = icoll.name
     icoll2.load()
     assert icoll._metadata == icoll2._metadata
     assert icoll.caching == icoll2.caching
+    assert icoll.itype == icoll2.itype
+    assert icoll.ifunc(1, 2) == icoll2.ifunc(1, 2)
 
     tag_list = ['foo', 'bar', 'bin', 'jack', 'bob', 'sys', 'usr', 'var', 'etc']
     for i, t in enumerate(tag_list, 1):
@@ -134,6 +144,8 @@ def test_increse_collection_dump_load(icoll, icoll2, tmpdir):
     icoll2.load()
     assert icoll._metadata == icoll2._metadata
     assert icoll.caching == icoll2.caching
+    assert icoll.itype == icoll2.itype
+    assert icoll.ifunc(1, 2) == icoll2.ifunc(1, 2)
 
 
 @pytest.mark.incremental
@@ -154,7 +166,9 @@ def test_increse_collection_batch_opes(icoll, icoll2, tmpdir):
         assert icoll._metadata[tagging][-1][:1] == [max(tslist)]
 
     icoll.dump()
-    icoll2.name = 'foo'
+    icoll2.name = icoll.name
     icoll2.load()
     assert icoll._metadata == icoll2._metadata
     assert icoll.caching == icoll2.caching
+    assert icoll.itype == icoll2.itype
+    assert icoll.ifunc(1, 2) == icoll2.ifunc(1, 2)
