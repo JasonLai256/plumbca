@@ -26,12 +26,6 @@ class Collection(object):
         self.lock = Lock()
         self.name = name
 
-    def __repl__(self):
-        return '<{}> - {}'.format(self.__class__.__name__, self.name)
-
-    def __str__(self):
-        return self.__repl__()
-
     def query(self, stime, etime, tagging):
         """Provide query API with time ranges parameter.
         """
@@ -74,6 +68,13 @@ class IncreaseCollection(Collection):
         self._info = {}
         self.itype = itype
         self.ifunc = self.opes[itype]
+
+    def __repl__(self):
+        return '<{} - {}> . {}'.format(self.__class__.__name__,
+                                       self.name, self.itype)
+
+    def __str__(self):
+        return self.__repl__()
 
     def info(self):
         return self._info
