@@ -11,6 +11,7 @@ import pytest
 
 from plumbca.collection import IncreaseCollection
 from plumbca.config import DefaultConf
+import plumbca.log
 
 
 def pytest_runtest_makereport(item, call):

@@ -102,6 +102,7 @@ class IncreaseCollection(Collection):
             self.ifunc = self.opes[self.itype]
             self._metadata = _tmp[2]
             self.caching = _tmp[3]
+        os.remove(fpath)
 
     def fetch(self, tagging='__all__', d=True, e=True):
         """Fetch the expired data from the store, there will delete the returned
