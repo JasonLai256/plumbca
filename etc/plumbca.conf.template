@@ -1,0 +1,17 @@
+[global]
+debug=1
+daemonize=no
+pidfile=/var/run/plumbca.pid
+bind=127.0.0.1
+port=4273
+transport=tcp
+# unixsocket=
+dumpdir=/var/lib/plumbca/
+activity_log=/var/log/plumbca/plumbca.log
+errors_log=/var/log/plumbca/plumbca_errors.log
+mark_version=1.0
+
+[redis]
+host=127.0.0.1
+port=6379
+db=0

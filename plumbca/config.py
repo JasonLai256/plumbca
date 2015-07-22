@@ -26,6 +26,12 @@ defaults = {
         'dumpdir': '/var/lib/plumbca/',
         'activity_log': '/var/log/plumbca/plumbca.log',
         'errors_log': '/var/log/plumbca/plumbca_errors.log',
+        'mark_version': '1.0',
+    },
+    'redis': {
+        'host': '127.0.0.1',
+        'port': '',
+        'db': '0',
     },
 }
 
@@ -44,7 +50,13 @@ class Config(dict):
         if not rv:
             raise PlumbcaConfigNotFound('Failed to read the config file {}'.format(f))
 
-        self.update({k: v for k, v in config.items(self._section)})
+        self.update({k: [i.strip() for i in v.split(',')] if ',' in v else v.strip()
+                         for k, v in config.items(self._section)})
+        self['debug'] = bool(self.get('debug'))
 
 
+CONFIG_PATH = '/etc/plumbca.conf'
 DefaultConf = Config('global')
+DefaultConf.readFrom(CONFIG_PATH)
+RedisConf = Config('redis')
+RedisConf.readFrom(CONFIG_PATH)
