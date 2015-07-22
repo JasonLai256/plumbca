@@ -17,7 +17,7 @@ from .config import DefaultConf
 from .collection import IncreaseCollection
 
 
-act_logger = logging.getLogger('activity')
+actlog = logging.getLogger('activity')
 err_logger = logging.getLogger('errors')
 
 
@@ -31,8 +31,8 @@ class CacheCtl(object):
 
     def restore_collections(self):
         if not os.path.exists(DefaultConf['dumpdir']):
-            act_logger.info("%s not exists, can't restore collections.",
-                            DefaultConf['dumpdir'])
+            actlog.info("%s not exists, can't restore collections.",
+                        DefaultConf['dumpdir'])
             return
 
         filelist = os.listdir(DefaultConf['dumpdir'])
@@ -41,28 +41,28 @@ class CacheCtl(object):
             m = ptn.match(fname)
             if m:
                 classname, collname = m.group(1), m.group(2)
-                act_logger.info("Start to loading %s to restore the collection.",
-                                fname)
+                actlog.info("Start to loading %s to restore the collection.",
+                            fname)
                 obj = globals()[classname](collname)
                 obj.load()
                 self.collmap[collname] = obj
-                act_logger.info("Successful restore the `%s` collection.", obj)
+                actlog.info("Successful restore the `%s` collection.", obj)
 
     def dump_collections(self):
         dumpdir = DefaultConf['dumpdir']
         if not os.path.exists(dumpdir):
-            act_logger.info("%s not exists, try to make it and dump collections.",
-                            dumpdir)
+            actlog.info("%s not exists, try to make it and dump collections.",
+                        dumpdir)
             os.makedirs(dumpdir)
 
         for collection in self.collmap.values():
-            act_logger.info("Start to dump `%s` collection.", collection)
+            actlog.info("Start to dump `%s` collection.", collection)
             collection.dump()
-            act_logger.info("Successful dumped `%s` collection.", collection)
+            actlog.info("Successful dumped `%s` collection.", collection)
 
     def get_collection(self, name):
         if name not in self.collmap:
-            act_logger.info("Collection %s not exists.", name)
+            actlog.info("Collection %s not exists.", name)
             return
 
         return self.collmap[name]
@@ -70,11 +70,11 @@ class CacheCtl(object):
     def ensure_collection(self, name, ctype, **kwargs):
         if name not in self.collmap:
             self.collmap[name] = globals()[ctype](name, **kwargs)
-            act_logger.info("Ensure collection not exists, create it, `%s`.",
-                            self.collmap[name])
+            actlog.info("Ensure collection not exists, create it, `%s`.",
+                        self.collmap[name])
         else:
-            act_logger.info("Ensure collection already exists, `%s`.",
-                            self.collmap[name])
+            actlog.info("Ensure collection already exists, `%s`.",
+                        self.collmap[name])
 
     def info(self):
         pass

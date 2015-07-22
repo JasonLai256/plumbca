@@ -8,6 +8,7 @@ setup(
     name='plumbca',
     version=__version__,
     install_requires=[
+        'pyzmq',
         'msgpack-python',
     ],
     packages=find_packages(exclude=["tests"]),

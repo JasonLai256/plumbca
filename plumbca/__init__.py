@@ -2,6 +2,6 @@
 
 version = (0, 1)
 
-__author__ = "JasonLai"
+__author__ = "Jason Lai"
 __license__ = "BSD"
 __version__ = '.'.join(str(n) for n in version)

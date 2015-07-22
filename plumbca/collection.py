@@ -49,7 +49,7 @@ class Collection(object):
 
 class IncreaseCollection(Collection):
     """Collection for store and cache the dict-like JSON data, and will be sorted
-    by tiem-series.
+    by time-series.
     """
 
     opes = {
@@ -59,14 +59,16 @@ class IncreaseCollection(Collection):
         'min': lambda x, y: min(x, y),
     }
 
-    def __init__(self, name, itype='inc'):
+    def __init__(self, name, itype='inc', expire=3600):
         super().__init__(name)
         self._metadata = {}
         self.caching = {}
+        self.taggings = set()
         self.md_lock = Lock()
         self.ca_lock = Lock()
         self._info = {}
         self.itype = itype
+        self.expire = expire
         self.ifunc = self.opes[itype]
 
     def __repl__(self):
