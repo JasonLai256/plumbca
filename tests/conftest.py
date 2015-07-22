@@ -56,3 +56,24 @@ def metadata_t():
         [188072, 'hello', 123],
         [228072, 'hello', 123]
     ]
+
+
+@pytest.fixture
+def fake_manager():
+    class _t:
+        def __init__(self):
+            self.collmap = {}
+
+    return _t()
+
+
+@pytest.fixture
+def fake_coll():
+    class _t:
+        def __init__(self):
+            self.name = ''
+            self.taggings = []
+            self.expire = 200
+            self.itype = 'inc'
+
+    return _t()
