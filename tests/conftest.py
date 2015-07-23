@@ -12,6 +12,7 @@ import pytest
 from plumbca.collection import IncreaseCollection
 from plumbca.config import DefaultConf
 import plumbca.log
+from plumbca.backend import rbackend
 
 
 def pytest_runtest_makereport(item, call):
@@ -71,9 +72,21 @@ def fake_manager():
 def fake_coll():
     class _t:
         def __init__(self):
-            self.name = ''
+            self.name = 'test'
             self.taggings = []
             self.expire = 200
             self.itype = 'inc'
 
     return _t()
+
+
+@pytest.fixture(scope='function')
+def rb(request):
+    def fin():
+        keys = rbackend.rdb.keys()
+        print('[RBACKEND FINISH] %s' % keys)
+        if keys:
+            rbackend.rdb.delete(*keys)
+    request.addfinalizer(fin)
+
+    return rbackend
