@@ -12,7 +12,7 @@ import pytest
 from plumbca.collection import IncreaseCollection
 from plumbca.config import DefaultConf
 import plumbca.log
-from plumbca.backend import rbackend
+from plumbca.backend import BackendFactory
 
 
 def pytest_runtest_makereport(item, call):
@@ -82,6 +82,8 @@ def fake_coll():
 
 @pytest.fixture(scope='function')
 def rb(request):
+    rbackend = BackendFactory('redis')
+
     def fin():
         keys = rbackend.rdb.keys()
         print('[RBACKEND FINISH] %s' % keys)

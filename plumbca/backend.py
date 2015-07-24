@@ -131,4 +131,11 @@ class RedisBackend:
         cache_key = self.cache_item_fmt.format(name=coll.name)
         self.rdb.delete(cache_key)
 
-rbackend = RedisBackend()
+
+_backends = {
+    'redis': RedisBackend(),
+}
+
+
+def BackendFactory(target):
+    return _backends.get(target)

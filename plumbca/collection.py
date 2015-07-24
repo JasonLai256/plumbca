@@ -68,7 +68,8 @@ class IncreaseCollection(Collection):
         self.ca_lock = Lock()
         self._info = {}
         self.itype = itype
-        self.expire = expire
+        # the expire should be unchangable in the instance live time
+        self._expire = expire
         self.ifunc = self.opes[itype]
 
     def __repl__(self):
@@ -192,11 +193,11 @@ class IncreaseCollection(Collection):
 
         return sindex, eindex + 1
 
-    def store(self, ts, tagging, value, expire=300):
+    def store(self, ts, tagging, value, expire=None):
         if not isinstance(value, dict):
             raise ValueError('The IncreaseCollection only accept Dict type value.')
         ts = int(ts)
-        expire = int(time.time()) + expire
+        expire = int(time.time()) + self._expire
         mdata = [ts, expire]
         keyname = self.update_matadata(tagging, mdata)
         self.update_value(keyname, value)

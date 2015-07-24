@@ -47,6 +47,7 @@ def test_redis_backend_inc_coll(rb, fake_coll):
     ]
     for expire, ts in pairs:
         _add_item(rb, fake_coll, tagging, expire, ts, v)
+    # double adding for checking the logic of duplacate handle
     for expire, ts in pairs:
         _add_item(rb, fake_coll, tagging, expire, ts, v)
 
