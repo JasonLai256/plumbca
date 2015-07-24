@@ -35,6 +35,10 @@ class RedisBackend:
         self.rdb.set(key, msgpack.packb(v))
 
     def get_collection_indexes(self):
+        """
+        :ret: return None if no data exists. Normal structure is:
+               {collection_name: collection_class_name}
+        """
         key = self.colls_index_fmt
         rv = self.rdb.get(key)
         return msgpack.unpackb(rv) if rv else None
@@ -49,6 +53,10 @@ class RedisBackend:
         self.rdb.set(key, msgpack.packb(v))
 
     def get_collection_data_index(self, coll):
+        """
+        :ret: return None if no data exists. Normal structure is:
+               {'taggings': taggings, 'expire': expire, 'type': type}
+        """
         key = self.colls_tagging_index_fmt.format(name=coll.name)
         rv = self.rdb.get(key)
         return msgpack.unpackb(rv) if rv else None
@@ -87,6 +95,14 @@ class RedisBackend:
         return res
 
     def inc_coll_timeline_metadata_query(self, coll, tagging, start, end):
+        """
+        :ret: return [] if no data exists. Normal structure is:
+                  # value, score
+                  [(expire_time1, ts1),
+                   (expire_time2, ts2),
+                   ...
+                   (expire_timeN, tsN)]
+        """
         tl_key = self.md_timeline_fmt.format(name=coll.name, tagging=tagging)
         pairs = self.rdb.zrangebyscore(tl_key, start, end, withscores=True)
         # there the value should be the expired time and the score is the
@@ -94,6 +110,14 @@ class RedisBackend:
         return [(int(value), score) for value, score in pairs]
 
     def inc_coll_expire_metadata_query(self, coll, tagging, expired_sentinel):
+        """
+        :ret: return [] if no data exists. Normal structure is:
+                  # value, score
+                  [([ts1, *args], expire_time1),
+                   ([ts2, *args], expire_time2),
+                   ...
+                   ([tsN, *args], expire_timeN)]
+        """
         ex_key = self.md_expire_fmt.format(name=coll.name, tagging=tagging)
         pairs = self.rdb.zrangebyscore(ex_key, 0, expired_sentinel,
                                        withscores=True)
@@ -110,6 +134,10 @@ class RedisBackend:
         self.rdb.hset(key, field, value)
 
     def inc_coll_caches_get(self, coll, *fields):
+        """
+        :ret: return [] if no data exists. Normal structure is:
+                [value1, value2, ..., valueN]
+        """
         key = self.cache_item_fmt.format(name=coll.name)
         rv = self.rdb.hmget(key, *fields)
         return [msgpack.unpackb(r) for r in rv if r]

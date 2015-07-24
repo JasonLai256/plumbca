@@ -11,6 +11,8 @@
 
 from bisect import bisect_left
 
+from msgpack import packb, unpackb
+
 
 def find_eq(a, x, ret_index=False):
     '''Find the leftmost item exactly equal to x'''
