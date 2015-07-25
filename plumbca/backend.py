@@ -43,6 +43,24 @@ class RedisBackend:
         rv = self.rdb.get(key)
         return msgpack.unpackb(rv) if rv else None
 
+    def get_collection_length(self, coll, tagging, klass=None):
+        if not klass:
+            klass = coll.__class__.__name__
+
+        rv = []
+        if klass == 'IncreaseCollection':
+            cache_key = self.cache_item_fmt.format(name=coll.name)
+            cache_len = self.rdb.hlen(cache_key)
+            rv.append(cache_len)
+
+            tl_key = self.md_timeline_fmt.format(name=coll.name, tagging=tagging)
+            ex_key = self.md_expire_fmt.format(name=coll.name, tagging=tagging)
+            tl_len = self.rdb.zcard(tl_key)
+            ex_len = self.rdb.zcard(ex_key)
+            rv.append((tagging, tl_len, ex_len))
+
+        return rv
+
     def set_collection_data_index(self, coll):
         key = self.colls_tagging_index_fmt.format(name=coll.name)
         v = {

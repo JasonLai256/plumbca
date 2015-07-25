@@ -11,6 +11,8 @@ import pytest
 
 from msgpack import packb, unpackb
 
+from functools import partial
+
 
 def test_redis_backend_basic(rb, fake_manager, fake_coll):
     fake_manager.collmap = {'t1': fake_coll, 't2': fake_coll}
@@ -38,18 +40,36 @@ def _mk_field(tagging, ts):
     return field_key
 
 
+def _assert_inc_coll_cache_size(rb, coll, tagging, cache_len, tl_len, ex_len):
+    rv = rb.get_collection_length(coll, tagging, klass="IncreaseCollection")
+    assert cache_len == rv[0]
+    tagging_info = rv[1]
+    assert tagging == tagging_info[0]
+    assert tl_len == tagging_info[1]
+    assert ex_len == tagging_info[2]
+
+
 def test_redis_backend_inc_coll(rb, fake_coll):
-    tagging = 'day'
+    tagging, other_tagging = 'day', 'for_diff'
     v = unpackb(packb({i: i for i in range(20)}))
     pairs = [
         (200, 100), (210, 110), (220, 120),
         (230, 130), (240, 140),
     ]
+    assert_cache_size = partial(_assert_inc_coll_cache_size, rb, fake_coll)
+
     for expire, ts in pairs:
         _add_item(rb, fake_coll, tagging, expire, ts, v)
     # double adding for checking the logic of duplacate handle
     for expire, ts in pairs:
         _add_item(rb, fake_coll, tagging, expire, ts, v)
+    # adding the other_tagging for the cache size check below
+    for expire, ts in pairs:
+        _add_item(rb, fake_coll, other_tagging, expire, ts, v)
+    print('Success Adding datas...\n\n\n')
+
+    assert_cache_size(tagging, 10, 5, 5)
+    assert_cache_size(other_tagging, 10, 5, 5)
 
     # @@ check the cache data
     fields = [_mk_field(tagging, ts) for expire, ts in pairs]
@@ -62,6 +82,8 @@ def test_redis_backend_inc_coll(rb, fake_coll):
     for r in rv:
         assert r is None
 
+    assert_cache_size(tagging, 5, 5, 5)
+
     # @@ check the timeline metadata data
     rv = rb.inc_coll_timeline_metadata_query(fake_coll, tagging, 100, 140)
     assert len(rv) == 5
@@ -70,7 +92,6 @@ def test_redis_backend_inc_coll(rb, fake_coll):
         assert int(r[0]) == int(p[0])
         # for ts
         assert int(r[1]) == int(p[1])
-    print('Success Adding datas...\n\n\n')
 
     # fetch the ts elements that use the inc_coll_expire_metadata_query
     exps = rb.inc_coll_expire_metadata_query(fake_coll, tagging, 100 * 100)
@@ -79,6 +100,8 @@ def test_redis_backend_inc_coll(rb, fake_coll):
     rv = rb.inc_coll_timeline_metadata_query(fake_coll, tagging, 100, 140)
     for r in rv:
         assert not r
+
+    assert_cache_size(tagging, 5, 0, 5)
 
     # @@ check the expire metadata data
     rv = rb.inc_coll_expire_metadata_query(fake_coll, tagging, 221)
@@ -95,3 +118,5 @@ def test_redis_backend_inc_coll(rb, fake_coll):
     rb.inc_coll_expire_metadata_del(fake_coll, tagging, 300)
     rv = rb.inc_coll_expire_metadata_query(fake_coll, tagging, 300)
     assert len(rv) == 0
+
+    assert_cache_size(tagging, 5, 0, 0)
