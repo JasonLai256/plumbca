@@ -15,7 +15,8 @@ import time
 import os
 
 from .config import DefaultConf
-from .helpers import find_ge, find_lt
+from .helpers import find_ge, find_lt, packb, unpackb
+from .backend import BackendFactory
 
 import msgpack
 
@@ -64,13 +65,15 @@ class IncreaseCollection(Collection):
         self._metadata = {}
         self.caching = {}
         self.taggings = set()
-        self.md_lock = Lock()
-        self.ca_lock = Lock()
         self._info = {}
-        self.itype = itype
         # the expire should be unchangable in the instance live time
-        self._expire = expire
+        self._expire = int(expire)
+        self.itype = itype
         self.ifunc = self.opes[itype]
+        self.bk = BackendFactory(DefaultConf['backend'])
+
+        # timestamp of datetime(2075, 8, 18, 13, 55, 33)
+        self.end_ts = 3333333333
 
     def __repl__(self):
         return '<{} - {}> . {}'.format(self.__class__.__name__,
@@ -79,185 +82,107 @@ class IncreaseCollection(Collection):
     def __str__(self):
         return self.__repl__()
 
+    def gen_key_name(self, ts, tagging):
+        return '{}:{}'.format(str(ts), tagging)
+
     def info(self):
         return self._info
 
     def dump(self):
-        fname = '{}.{}.dump'.format(self.__class__.__name__, self.name)
-        fpath = os.path.join(DefaultConf.get('dumpdir'), fname)
-        with open(fpath, 'wb') as f:
-            _tmp = [
-                self.name,
-                self.itype,
-                self._metadata,
-                self.caching,
-            ]
-            f.write(msgpack.packb(_tmp))
+        self.bk.set_collection_data_index(self)
 
     def load(self):
-        fname = '{}.{}.dump'.format(self.__class__.__name__, self.name)
-        fpath = os.path.join(DefaultConf.get('dumpdir'), fname)
-        with open(fpath, 'rb') as f:
-            _tmp = msgpack.unpackb(f.read(), encoding='utf-8')
-            if _tmp[0] != self.name:
-                return
-            self.itype = _tmp[1]
-            self.ifunc = self.opes[self.itype]
-            self._metadata = _tmp[2]
-            self.caching = _tmp[3]
-        os.remove(fpath)
+        rv = self.bk.get_collection_data_index(self)
+        self.taggings = set(rv['taggings'])
+        self._expire = int(rv['expire'])
+        self.itype = rv['type']
+        self.ifunc = self.opes[self.itype]
 
-    def fetch(self, tagging='__all__', d=True, e=True):
+    def query(self, stime, etime, tagging):
+        if stime > etime or tagging not in self.taggings:
+            return
+
+        mds = self.bk.inc_coll_timeline_metadata_query(self, tagging,
+                                                       stime, etime)
+        if not mds:
+            return
+
+        tslist = [int(item[1]) for item in mds]
+        keys = [self.gen_key_name(ts, tagging) for ts in tslist]
+        return zip(keys, self.bk.inc_coll_caches_get(self, *keys))
+
+    def store(self, ts, tagging, value, expire_from_now=False):
+        if not isinstance(value, dict):
+            raise ValueError('The IncreaseCollection only accept Dict type value.')
+        self.taggings.add(tagging)
+        ts = int(ts)
+        if expire_from_now:
+            expire = int(time.time()) + self._expire
+        else:
+            expire = ts + self._expire
+        keyname = self.gen_key_name(ts, tagging)
+        self.bk.inc_coll_metadata_set(self, tagging, expire, ts)
+        self._update_value(keyname, value)
+
+    def _update_value(self, keyname, inc_value):
+        """Using increase method to handle items between value and
+        self.caching[key].
+        """
+        base = self.bk.inc_coll_caches_get(self, keyname)
+        if base:
+            base = base[0]
+            for k, v in inc_value.items():
+                if k in base:
+                    base[k] = self.ifunc(base[k], int(v))
+                else:
+                    base[k] = int(v)
+        else:
+            base = inc_value
+
+        # print('update -', keyname, base)
+        self.bk.inc_coll_cache_set(self, keyname, base)
+
+    def fetch(self, tagging='__all__', d=True, e=True, expired=None):
         """Fetch the expired data from the store, there will delete the returned
         items by default.
 
         :param tagging: specific tagging value for the collection
         :param d: whether delete the returned items.
         :param e: only fetch expired data if True.
+        :param expired: if `e` specify to True and expired can to specify
+                        the specific expire time.
         """
-        if tagging != '__all__' and tagging not in self._metadata:
-            return
-        rv = []
-
-        with self.md_lock, self.ca_lock:
-            now = time.time()
-            if tagging == '__all__':
-                for t in self._metadata:
-                    _res = self._fetch_expired(now, t, d) if e else self._fetch_all(t, d)
-                    rv.extend(_res)
-            else:
-                t = tagging
-                _res = self._fetch_expired(now, t, d) if e else self._fetch_all(t, d)
-                rv.extend(_res)
-
-        return rv
-
-    def _fetch_expired(self, now, tagging, d):
-        rv = []
-        indexes = []
-        metadata = self._metadata[tagging]
-        for i, mdata in enumerate(metadata):
-            if now > mdata[-1]:
-                key = self.gen_key_name(mdata[0], tagging)
-                item = key.split(',') + [self.caching[key]]
-                rv.append(item)
-                if d:
-                    del self.caching[key]
-                    indexes.append(i)
-
-        # remove all the expired metadata from the self._metadata and the self.caching
-        if d and indexes:
-            for index in reversed(indexes):
-                del metadata[index]
-
-        return rv
-
-    def _fetch_all(self, tagging, d):
-        rv = []
-        metadata = self._metadata[tagging]
-        for mdata in metadata:
-            key = self.gen_key_name(mdata[0], tagging)
-            item = key.split(',') + [self.caching[key]]
-            rv.append(item)
-            if d:
-                del self.caching[key]
-
-        # remove all the metadata from the self._metadata and the self.caching
-        if d:
-            for index in reversed(range(len(metadata))):
-                del metadata[index]
-
-        return rv
-
-    def query(self, stime, etime, tagging):
-        if stime > etime or tagging not in self._metadata:
-            return
-        start, end = self.ensure_index_range(stime, etime, tagging)
-        if start == -1:
+        if tagging != '__all__' and tagging not in self.taggings:
             return
 
         rv = []
-        for mdata in self._metadata[tagging][start:end]:
-            key = self.gen_key_name(mdata[0], tagging)
-            item = key.split(',') + [self.caching[key]]
-            rv.append(item)
-
-        return rv
-
-    def ensure_index_range(self, stime, etime, tagging):
-        try:
-            sindex = find_ge(self._metadata[tagging], [stime], True)
-            eindex = find_lt(self._metadata[tagging], [etime], True)
-        except ValueError:
-            sindex, eindex = -1, -1
-
-        return sindex, eindex + 1
-
-    def store(self, ts, tagging, value, expire=None):
-        if not isinstance(value, dict):
-            raise ValueError('The IncreaseCollection only accept Dict type value.')
-        ts = int(ts)
-        expire = int(time.time()) + self._expire
-        mdata = [ts, expire]
-        keyname = self.update_matadata(tagging, mdata)
-        self.update_value(keyname, value)
-
-    def update_value(self, key, value):
-        """Using increase method to handle items between value and
-        self.caching[key].
-        """
-        if key in self.caching:
-            cache_item = self.caching[key]
+        if e and expired:
+            sentinel = expired
+        elif e:
+            sentinel = int(time.time())
         else:
-            raise ValueError('The key ({}) not in caching store.'.format(key))
+            sentinel = self.end_ts
 
-        for k, v in value.items():
-            if k in cache_item:
-                cache_item[k] = self.ifunc(cache_item[k], int(v))
-            else:
-                cache_item[k] = int(v)
-
-    def update_matadata(self, tagging, mdata):
-        '''The structure of the _metadata is::
-
-        tagging: {
-            (ts1, expire_time),
-            (ts2, expire_time),
-            ...
-            (tsN, expire_time)
-        }
-        '''
-        keyname = self.gen_key_name(mdata[0], tagging)
-        if not self.metadata_exists(mdata[0], tagging):
-            insort(self._metadata[tagging], mdata)
-            self.caching[keyname] = {}
-        return keyname
-
-    def metadata_exists(self, ts, tagging, ret_index=False):
-        """checking the part of metadata - [ts, tagging] - is existing in the
-        self._metadata.
-        """
-        exists = False
-        if tagging in self._metadata:
-            metadatas = self._metadata[tagging]
-            # locate the index of tmp_data in self._metadata[tagging]
-            try:
-                tmp_data = [ts]
-                index = find_lt(metadatas, tmp_data, True) + 1
-                if index == len(metadatas):
-                    # ensured tmp_data not exists
-                    raise ValueError
-            except ValueError:
-                # Not found the mdata that less than the tmp_data, assign index to 0.
-                index = 0
-
-            mdata = metadatas[index]
-            if mdata[:1] == tmp_data:
-                exists = True
+        if tagging == '__all__':
+            for t in self.taggings:
+                yield from self._fetch_expired(sentinel, t, d)
         else:
-            self._metadata[tagging] = []
+            yield from self._fetch_expired(sentinel, tagging, d)
 
-        return index if ret_index else exists
+    def _fetch_expired(self, sentinel, tagging, d):
+        mds = self.bk.inc_coll_expire_metadata_query(self, tagging, sentinel)
+        # get the expire_time and ts values.
+        ts = [ex[0][0] for ex in mds]
+        keys = [self.gen_key_name(t, tagging) for t in ts]
+        rv = self.bk.inc_coll_caches_get(self, *keys)
 
-    def gen_key_name(self, ts, tagging):
-        return '{},{}'.format(str(ts), tagging)
+        # remove all the expired metadata and the cache items
+        if d and rv:
+            exps = [int(ex[1]) for ex in mds]
+            expired_sentinel = max(exp for exp in exps) + 1
+            self.bk.inc_coll_timeline_metadata_del(self, tagging, *exps)
+            self.bk.inc_coll_expire_metadata_del(self, tagging,
+                                                 expired_sentinel)
+            self.bk.inc_coll_caches_del(self, *keys)
+
+        return zip(keys, rv)

@@ -9,8 +9,6 @@
 
 import pytest
 
-from msgpack import packb, unpackb
-
 from functools import partial
 
 
@@ -19,20 +17,20 @@ def test_redis_backend_basic(rb, fake_manager, fake_coll):
     rb.set_collection_indexes(fake_manager)
     rv = rb.get_collection_indexes()
     matching = {'t1': '_t', 't2': '_t'}
-    assert rv == unpackb(packb(matching))
+    assert rv == matching
 
     fake_coll.taggings = ['minute', 'code_minute', 'hour', 'rtmp_minute']
-    rb.set_collection_data_index(fake_coll)
+    rb.set_collection_data_index(fake_coll, klass="IncreaseCollection")
     rv = rb.get_collection_data_index(fake_coll)
     matching = {'taggings': fake_coll.taggings,
-                'expire': fake_coll.expire,
+                'expire': fake_coll._expire,
                 'type': fake_coll.itype}
-    assert rv == unpackb(packb(matching))
+    assert rv == matching
 
 
 def _add_item(rb, coll, tagging, expire, ts, value):
     rb.inc_coll_metadata_set(coll, tagging, expire, ts)
-    rb.inc_coll_cache_set(coll, _mk_field(tagging, ts), packb(value))
+    rb.inc_coll_cache_set(coll, _mk_field(tagging, ts), value)
 
 
 def _mk_field(tagging, ts):
@@ -51,13 +49,14 @@ def _assert_inc_coll_cache_size(rb, coll, tagging, cache_len, tl_len, ex_len):
 
 def test_redis_backend_inc_coll(rb, fake_coll):
     tagging, other_tagging = 'day', 'for_diff'
-    v = unpackb(packb({i: i for i in range(20)}))
+    v = {i: i for i in range(20)}
     pairs = [
         (200, 100), (210, 110), (220, 120),
         (230, 130), (240, 140),
     ]
     assert_cache_size = partial(_assert_inc_coll_cache_size, rb, fake_coll)
 
+    # ---------------- check the operation of item adding ----------------
     for expire, ts in pairs:
         _add_item(rb, fake_coll, tagging, expire, ts, v)
     # double adding for checking the logic of duplacate handle
@@ -71,7 +70,7 @@ def test_redis_backend_inc_coll(rb, fake_coll):
     assert_cache_size(tagging, 10, 5, 5)
     assert_cache_size(other_tagging, 10, 5, 5)
 
-    # @@ check the cache data
+    # ---------------------- check the cache data ----------------------
     fields = [_mk_field(tagging, ts) for expire, ts in pairs]
     rv = rb.inc_coll_caches_get(fake_coll, *fields)
     for r in rv:
@@ -84,7 +83,7 @@ def test_redis_backend_inc_coll(rb, fake_coll):
 
     assert_cache_size(tagging, 5, 5, 5)
 
-    # @@ check the timeline metadata data
+    # ------------------ check the timeline metadata data ------------------
     rv = rb.inc_coll_timeline_metadata_query(fake_coll, tagging, 100, 140)
     assert len(rv) == 5
     for r, p in zip(rv, pairs):
@@ -103,7 +102,7 @@ def test_redis_backend_inc_coll(rb, fake_coll):
 
     assert_cache_size(tagging, 5, 0, 5)
 
-    # @@ check the expire metadata data
+    # ------------------ check the expire metadata data ------------------
     rv = rb.inc_coll_expire_metadata_query(fake_coll, tagging, 221)
     assert len(rv) == 3
     rv = rb.inc_coll_expire_metadata_query(fake_coll, tagging, 300)
@@ -120,3 +119,8 @@ def test_redis_backend_inc_coll(rb, fake_coll):
     assert len(rv) == 0
 
     assert_cache_size(tagging, 5, 0, 0)
+
+    # ---------------- check for the inc_coll_keys_delete ----------------
+    assert_cache_size(other_tagging, 5, 5, 5)
+    rb.inc_coll_keys_delete(fake_coll, [other_tagging])
+    assert_cache_size(other_tagging, 0, 0, 0)

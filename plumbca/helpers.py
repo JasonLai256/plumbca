@@ -10,8 +10,13 @@
 """
 
 from bisect import bisect_left
+from functools import partial
 
 from msgpack import packb, unpackb
+
+
+packb = partial(packb, use_bin_type=True)
+unpackb = partial(unpackb, encoding='utf-8')
 
 
 def find_eq(a, x, ret_index=False):

@@ -10,9 +10,9 @@
 """
 
 from redis import StrictRedis
-import msgpack
 
 from .config import DefaultConf as dfconf, RedisConf as rdconf
+from .helpers import packb, unpackb
 
 
 class RedisBackend:
@@ -32,7 +32,7 @@ class RedisBackend:
         key = self.colls_index_fmt
         v = {name: instance.__class__.__name__
                  for name, instance in manager.collmap.items()}
-        self.rdb.set(key, msgpack.packb(v))
+        self.rdb.set(key, packb(v))
 
     def get_collection_indexes(self):
         """
@@ -41,7 +41,7 @@ class RedisBackend:
         """
         key = self.colls_index_fmt
         rv = self.rdb.get(key)
-        return msgpack.unpackb(rv) if rv else None
+        return unpackb(rv) if rv else None
 
     def get_collection_length(self, coll, tagging, klass=None):
         if not klass:
@@ -58,17 +58,23 @@ class RedisBackend:
             tl_len = self.rdb.zcard(tl_key)
             ex_len = self.rdb.zcard(ex_key)
             rv.append((tagging, tl_len, ex_len))
+            # print('** TL -', self.rdb.zrange(tl_key, 0, -1, withscores=True))
+            # print('** EX -', self.rdb.zrange(ex_key, 0, -1, withscores=True))
 
         return rv
 
-    def set_collection_data_index(self, coll):
-        key = self.colls_tagging_index_fmt.format(name=coll.name)
-        v = {
-            'taggings': list(coll.taggings),
-            'expire': coll.expire,
-            'type': coll.itype
-        }
-        self.rdb.set(key, msgpack.packb(v))
+    def set_collection_data_index(self, coll, klass=None):
+        if not klass:
+            klass = coll.__class__.__name__
+
+        if klass == 'IncreaseCollection':
+            key = self.colls_tagging_index_fmt.format(name=coll.name)
+            v = {
+                'taggings': list(coll.taggings),
+                'expire': coll._expire,
+                'type': coll.itype
+            }
+            self.rdb.set(key, packb(v))
 
     def get_collection_data_index(self, coll):
         """
@@ -77,7 +83,7 @@ class RedisBackend:
         """
         key = self.colls_tagging_index_fmt.format(name=coll.name)
         rv = self.rdb.get(key)
-        return msgpack.unpackb(rv) if rv else None
+        return unpackb(rv) if rv else None
 
     def inc_coll_metadata_set(self, coll, tagging, expts, ts, *args):
         """ Insert data to the metadata structure if timestamp data do not
@@ -97,11 +103,12 @@ class RedisBackend:
             self.rdb.zadd(tl_key, ts, expts)
             mddata = [ts] + list(args)
             ex_key = self.md_expire_fmt.format(name=coll.name, tagging=tagging)
-            self.rdb.zadd(ex_key, expts, msgpack.packb(mddata))
-        # print('-'*10)
-        # print(self.rdb.zrange(tl_key, 0, -1, withscores=True))
-        # print(self.rdb.zrange(ex_key, 0, -1, withscores=True))
-        # print('+'*10)
+            self.rdb.zadd(ex_key, expts, packb(mddata))
+            # print('-'*10)
+            # print(tagging)
+            # print(self.rdb.zrange(tl_key, 0, -1, withscores=True))
+            # print(self.rdb.zrange(ex_key, 0, -1, withscores=True))
+            # print('+'*10)
 
     def inc_coll_timeline_metadata_del(self, coll, tagging, *expire_times):
         """ Delete the items of the timeline metadata with the privided
@@ -141,7 +148,7 @@ class RedisBackend:
                                        withscores=True)
         # there the value should be the collection data and the score is
         # the expired time.
-        return [(msgpack.unpackb(value), score) for value, score in pairs]
+        return [(unpackb(value), score) for value, score in pairs]
 
     def inc_coll_expire_metadata_del(self, coll, tagging, expired_sentinel):
         ex_key = self.md_expire_fmt.format(name=coll.name, tagging=tagging)
@@ -149,7 +156,7 @@ class RedisBackend:
 
     def inc_coll_cache_set(self, coll, field, value):
         key = self.cache_item_fmt.format(name=coll.name)
-        self.rdb.hset(key, field, value)
+        self.rdb.hset(key, field, packb(value))
 
     def inc_coll_caches_get(self, coll, *fields):
         """
@@ -158,7 +165,9 @@ class RedisBackend:
         """
         key = self.cache_item_fmt.format(name=coll.name)
         rv = self.rdb.hmget(key, *fields)
-        return [msgpack.unpackb(r) for r in rv if r]
+        # print('inc_coll_caches_get - ', rv)
+        # print('inc_coll_caches_get After - ', [unpackb(r) for r in rv if r])
+        return [unpackb(r) for r in rv if r]
 
     def inc_coll_caches_del(self, coll, *fields):
         key = self.cache_item_fmt.format(name=coll.name)

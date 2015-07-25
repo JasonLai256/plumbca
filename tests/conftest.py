@@ -59,6 +59,11 @@ def metadata_t():
     ]
 
 
+@pytest.fixture()
+def tag_list():
+    return ['foo', 'bar', 'bin', 'jack', 'bob', 'sys', 'usr', 'var', 'etc']
+
+
 @pytest.fixture
 def fake_manager():
     class _t:
@@ -74,7 +79,7 @@ def fake_coll():
         def __init__(self):
             self.name = 'test'
             self.taggings = []
-            self.expire = 200
+            self._expire = 200
             self.itype = 'inc'
 
     return _t()

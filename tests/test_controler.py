@@ -29,17 +29,17 @@ def test_cachectl_basic():
     assert CacheCtl.get_collection('not_exists') is None
 
 
-def test_cachectl_dump_restore_collections():
-    assert len(os.listdir(cache.DefaultConf['dumpdir'])) == 0
-    CacheCtl.dump_collections()
-    assert len(os.listdir(cache.DefaultConf['dumpdir'])) == 5
+# def test_cachectl_dump_restore_collections():
+#     assert len(os.listdir(cache.DefaultConf['dumpdir'])) == 0
+#     CacheCtl.dump_collections()
+#     assert len(os.listdir(cache.DefaultConf['dumpdir'])) == 5
 
-    # clean up the existing data in CacheCtl
-    id_pair = {name: id(coll) for name, coll in CacheCtl.collmap.items()}
-    CacheCtl.collmap = {}
+#     # clean up the existing data in CacheCtl
+#     id_pair = {name: id(coll) for name, coll in CacheCtl.collmap.items()}
+#     CacheCtl.collmap = {}
 
-    CacheCtl.restore_collections()
-    for name, collid in id_pair.items():
-        coll = CacheCtl.collmap[name]
-        assert collid != id(coll)
-        assert str(coll) == '<IncreaseCollection - {}> . inc'.format(name)
+#     CacheCtl.restore_collections()
+#     for name, collid in id_pair.items():
+#         coll = CacheCtl.collmap[name]
+#         assert collid != id(coll)
+#         assert str(coll) == '<IncreaseCollection - {}> . inc'.format(name)
