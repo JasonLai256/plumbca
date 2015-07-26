@@ -15,6 +15,7 @@ import os
 
 from .config import DefaultConf
 from .collection import IncreaseCollection
+from .backend import BackendFactory
 
 
 actlog = logging.getLogger('activity')
@@ -26,6 +27,7 @@ class CacheCtl(object):
     def __init__(self, try_restore=True):
         self.collmap = {}
         self.info = {}
+        self.bk = BackendFactory(DefaultConf['backend'])
         if try_restore:
             self.restore_collections()
 
@@ -70,6 +72,7 @@ class CacheCtl(object):
     def ensure_collection(self, name, ctype, **kwargs):
         if name not in self.collmap:
             self.collmap[name] = globals()[ctype](name, **kwargs)
+            self.bk.set_collection_indexes(self)
             actlog.info("Ensure collection not exists, create it, `%s`.",
                         self.collmap[name])
         else:

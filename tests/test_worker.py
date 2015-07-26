@@ -10,14 +10,9 @@
 import pytest
 import msgpack
 
-from msgpack import packb, unpackb
-
 from plumbca.worker import Worker
 from plumbca.message import message_process_success
-
-
-def transform_response(r):
-    return msgpack.unpackb(r)
+from plumbca.helpers import packb, unpackb
 
 
 @pytest.mark.incremental
@@ -28,11 +23,11 @@ def test_worker_basic():
     coll_list = ['foo', 'bar', 'ken', 'kaf', 'abc']
     for coll in coll_list:
         worker.store(coll, 123, tag, val)
-    r = transform_response(worker.get_collections())
-    assert r[b'headers'][b'status'] == message_process_success
-    assert sorted(r[b'datas']) == sorted(unpackb(packb(coll_list)))
+    r = unpackb(worker.get_collections())
+    assert r['headers']['status'] == message_process_success
+    assert sorted(r['datas']) == sorted(coll_list)
 
     for coll in coll_list:
-        r = transform_response(worker.query(coll, 10, 1000, tag))
-        print(r)
-        assert r[b'datas'] == unpackb(packb([val]))
+        r = unpackb(worker.query(coll, 10, 1000, tag))
+        # print('Get response -', r)
+        assert r['datas'][0][1] == val

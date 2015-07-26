@@ -100,7 +100,7 @@ class Worker(object):
         """
         coll = self._ensure_collection(collection)
         rv = coll.query(*args, **kwargs)
-        return Response(datas=rv)
+        return Response(datas=list(rv))
 
     def fetch(self, collection, *args, **kwargs):
         """

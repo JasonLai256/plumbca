@@ -9,16 +9,11 @@
     :license: BSD, see LICENSE for more details.
 """
 
-from bisect import insort
 from threading import Lock
 import time
-import os
 
 from .config import DefaultConf
-from .helpers import find_ge, find_lt, packb, unpackb
 from .backend import BackendFactory
-
-import msgpack
 
 
 class Collection(object):

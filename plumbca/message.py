@@ -10,8 +10,8 @@
 """
 
 import logging
-import msgpack
 
+from .helpers import packb, unpackb
 from .exceptions import MessageFormatError
 
 
@@ -38,7 +38,7 @@ class Request(object):
         try:
             self.addr = raw_message[0]
             self.command = raw_message[1]
-            self._message = msgpack.unpackb(raw_message[2])
+            self._message = unpackb(raw_message[2])
 
             actlog.debug('<Request %s - %s>', self.command, self._message)
             # __getitem__ will raise if key not exists
@@ -74,7 +74,8 @@ class Response(tuple):
                          len(response['datas']))
             errlog.debug('<Response %s - %s> ', response['headers']['status'],
                          len(response['datas']))
-            msg = msgpack.packb(response)
+            # print('Gen Responses -', response)
+            msg = packb(response)
         except KeyError:
             errlog.exception("Invalid response message.")
             raise
