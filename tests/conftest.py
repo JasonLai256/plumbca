@@ -9,8 +9,12 @@
 
 import pytest
 
+import random
+import logging
+
 from plumbca.collection import IncreaseCollection
 from plumbca.config import DefaultConf
+from plumbca.cache import CacheCtl
 import plumbca.log
 from plumbca.backend import BackendFactory
 
@@ -59,9 +63,29 @@ def metadata_t():
     ]
 
 
+_names = [
+    'foo', 'bar', 'bin', 'jack', 'bob',
+    'sys', 'usr', 'var', 'etc', 'jason',
+    'ben', 'kevin', 'ken', 'kafka', 'justin',
+    'jackson', 'jacob', 'jacqueline', 'jacques', 'abbie',
+    'abbott', 'abbra', 'abby', 'abdul', 'lacy',
+    'laddie', 'ladonna', 'lael', 'quillan', 'quin',
+    'quincy', 'quinlan', 'taber', 'tabitha', 'tacita',
+    'tacy', 'tad', 'tadeo', 'taffy', 'tai',
+    'taifa', 'ulric', 'ulysses', 'uma', 'umay',
+    'umberto',
+]
+
 @pytest.fixture()
 def tag_list():
-    return ['foo', 'bar', 'bin', 'jack', 'bob', 'sys', 'usr', 'var', 'etc']
+    random.shuffle(_names)
+    return _names[:9]
+
+
+@pytest.fixture()
+def coll_list():
+    random.shuffle(_names)
+    return _names[:5]
 
 
 @pytest.fixture
@@ -88,12 +112,25 @@ def fake_coll():
 @pytest.fixture(scope='function')
 def rb(request):
     rbackend = BackendFactory('redis')
+    aclog = logging.getLogger('activity')
 
     def fin():
         keys = rbackend.rdb.keys()
-        print('[RBACKEND FINISH] %s' % keys)
+        aclog.warning('[RBACKEND FINISH] %s - %s', keys, len(keys))
+        aclog.warning('[RBACKEND FINISH] module %s, function: %s',
+                      request.module, request.function)
         if keys:
-            rbackend.rdb.delete(*keys)
+            rv = rbackend.rdb.delete(*keys)
+            aclog.warning('[RBACKEND CLEAN UP] deleted %s items.', rv)
     request.addfinalizer(fin)
 
     return rbackend
+
+
+@pytest.fixture(scope='function')
+def cachectl(request):
+    def fin():
+        CacheCtl.collmap = {}
+    request.addfinalizer(fin)
+
+    return CacheCtl

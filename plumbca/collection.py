@@ -88,6 +88,7 @@ class IncreaseCollection(Collection):
 
     def load(self):
         rv = self.bk.get_collection_data_index(self)
+        print('coll load -', rv)
         self.taggings = set(rv['taggings'])
         self._expire = int(rv['expire'])
         self.itype = rv['type']

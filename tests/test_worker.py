@@ -16,11 +16,12 @@ from plumbca.helpers import packb, unpackb
 
 
 @pytest.mark.incremental
-def test_worker_basic():
+def test_worker_basic(rb, coll_list):
     worker = Worker()
     tag = 'www.cdnzz.com'
     val = {'test': 1}
-    coll_list = ['foo', 'bar', 'ken', 'kaf', 'abc']
+    print(unpackb(worker.get_collections()))
+    print(coll_list)
     for coll in coll_list:
         worker.store(coll, 123, tag, val)
     r = unpackb(worker.get_collections())

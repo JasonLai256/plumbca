@@ -32,31 +32,18 @@ class CacheCtl(object):
             self.restore_collections()
 
     def restore_collections(self):
-        if not os.path.exists(DefaultConf['dumpdir']):
-            actlog.info("%s not exists, can't restore collections.",
-                        DefaultConf['dumpdir'])
-            return
-
-        filelist = os.listdir(DefaultConf['dumpdir'])
-        ptn = re.compile(r'(\w+)\.(\w+)\.dump')
-        for fname in filelist:
-            m = ptn.match(fname)
-            if m:
-                classname, collname = m.group(1), m.group(2)
-                actlog.info("Start to loading %s to restore the collection.",
-                            fname)
-                obj = globals()[classname](collname)
-                obj.load()
-                self.collmap[collname] = obj
-                actlog.info("Successful restore the `%s` collection.", obj)
+        indexes = self.bk.get_collection_indexes()
+        if indexes:
+            self.collmap = {}
+            print(indexes)
+            for name, klass in indexes.items():
+                actlog.info("Start to restore the collection - %s (%s).", name, klass)
+                self.collmap[name] = globals()[klass](name)
+                self.collmap[name].load()
+                actlog.info("Successful restore the `%s` collection.", name)
 
     def dump_collections(self):
-        dumpdir = DefaultConf['dumpdir']
-        if not os.path.exists(dumpdir):
-            actlog.info("%s not exists, try to make it and dump collections.",
-                        dumpdir)
-            os.makedirs(dumpdir)
-
+        self.bk.set_collection_indexes(self)
         for collection in self.collmap.values():
             actlog.info("Start to dump `%s` collection.", collection)
             collection.dump()

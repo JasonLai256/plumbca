@@ -10,36 +10,44 @@
 import pytest
 import os
 
-from plumbca.cache import CacheCtl
 from plumbca import cache
 
 
-def test_cachectl_basic():
-    coll_list = ['foo', 'bar', 'ken', 'kaf', 'abc']
+def test_cachectl_basic(rb, cachectl, coll_list):
     for cname in coll_list:
-        CacheCtl.ensure_collection(cname, 'IncreaseCollection')
-        CacheCtl.ensure_collection(cname, 'IncreaseCollection')
-    assert len(CacheCtl.collmap) == 5
+        cachectl.ensure_collection(cname, 'IncreaseCollection')
+        cachectl.ensure_collection(cname, 'IncreaseCollection')
+    assert len(cachectl.collmap) == 5
 
+    tagging1, tagging2 = 'admin', 'fortest'
+
+    # ------------------ test for store operation ------------------
     for cname in coll_list:
-        coll = CacheCtl.get_collection(cname)
+        coll = cachectl.get_collection(cname)
         for i in range(100):
-            coll.store(i, 'admin', {'bar': 1})
+            coll.store(i, tagging1, {'bar': 1})
+            coll.store(i, tagging2, {'bar': 1})
         assert str(coll) == '<IncreaseCollection - {}> . inc'.format(cname)
-    assert CacheCtl.get_collection('not_exists') is None
+        rv = rb.get_collection_length(coll, tagging1)
+        assert rv[0] == 200
+        assert rv[1][1] == rv[1][2] == 100
+        rv = rb.get_collection_length(coll, tagging2)
+        assert rv[0] == 200
+        assert rv[1][1] == rv[1][2] == 100
 
+    # --------------- test for dump, load operations ---------------
+    cachectl.dump_collections()
+    cachectl.collmap = None
+    cachectl.restore_collections()
+    for cname in coll_list:
+        assert cname in cachectl.collmap
+        coll = cachectl.get_collection(cname)
+        assert str(coll) == '<IncreaseCollection - {}> . inc'.format(cname)
+        rv = rb.get_collection_length(coll, tagging1)
+        assert rv[0] == 200
+        assert rv[1][1] == rv[1][2] == 100
+        rv = rb.get_collection_length(coll, tagging2)
+        assert rv[0] == 200
+        assert rv[1][1] == rv[1][2] == 100
 
-# def test_cachectl_dump_restore_collections():
-#     assert len(os.listdir(cache.DefaultConf['dumpdir'])) == 0
-#     CacheCtl.dump_collections()
-#     assert len(os.listdir(cache.DefaultConf['dumpdir'])) == 5
-
-#     # clean up the existing data in CacheCtl
-#     id_pair = {name: id(coll) for name, coll in CacheCtl.collmap.items()}
-#     CacheCtl.collmap = {}
-
-#     CacheCtl.restore_collections()
-#     for name, collid in id_pair.items():
-#         coll = CacheCtl.collmap[name]
-#         assert collid != id(coll)
-#         assert str(coll) == '<IncreaseCollection - {}> . inc'.format(name)
+    assert cachectl.get_collection('not_exists') is None

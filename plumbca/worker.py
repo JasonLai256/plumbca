@@ -44,7 +44,7 @@ class Worker(object):
         # register service
         self.sock.send_multipart(['register_service', 'worker', 'READY'])
         poller = zmq.Poller()
-        poller.register(broker.frontend, zmq.POLLIN)
+        poller.register(self.sock, zmq.POLLIN)
         while True:
             try:
                 poller.poll()
@@ -116,11 +116,6 @@ class Worker(object):
         rv = coll.fetch(*args, **kwargs)
         return Response(datas=rv)
 
-    def get_collection(self, collection):
-        """
-        """
-        pass
-
     def get_collection_info(self, collection):
         """
         """
@@ -131,11 +126,6 @@ class Worker(object):
         """
         rv = list(CacheCtl.collmap.keys())
         return Response(datas=rv)
-
-    def get_info(self):
-        """
-        """
-        pass
 
     def _gen_response(self, request, cmd_status, cmd_value):
         if cmd_status == FAILURE_STATUS:
