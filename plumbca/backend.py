@@ -163,6 +163,9 @@ class RedisBackend:
         :ret: return [] if no data exists. Normal structure is:
                 [value1, value2, ..., valueN]
         """
+        if not fields:
+            return []
+
         key = self.cache_item_fmt.format(name=coll.name)
         rv = self.rdb.hmget(key, *fields)
         # print('inc_coll_caches_get - ', rv)
