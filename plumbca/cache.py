@@ -56,9 +56,9 @@ class CacheCtl(object):
 
         return self.collmap[name]
 
-    def ensure_collection(self, name, ctype, **kwargs):
+    def ensure_collection(self, name, ctype, expire, **kwargs):
         if name not in self.collmap:
-            self.collmap[name] = globals()[ctype](name, **kwargs)
+            self.collmap[name] = globals()[ctype](name, expire=expire, **kwargs)
             self.bk.set_collection_indexes(self)
             actlog.info("Ensure collection not exists, create it, `%s`.",
                         self.collmap[name])

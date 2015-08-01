@@ -14,7 +14,6 @@ import logging
 import traceback
 
 from .config import DefaultConf
-# from .watcher import Watcher
 from .worker import Worker
 from . import constants
 
@@ -36,15 +35,14 @@ class Broker:
         self.backend.bind(constants.BACKEND_IPC)
         aclog.info('Broker backend successful binding to ipc.')
 
-        self.service_list = ['worker', 'watcher']
+        self.service_list = ['worker']
         self.service_map = {}
-        self.worker_cmd = ['store', 'query', 'fetch', 'wping', 'dumps',
-                           'get_collections', 'get_collection_info',
-                           'get_collections', 'get_info']
+        self.worker_cmd = ['store', 'query', 'fetch', 'wping', 'dump',
+                           'get_collections', 'ensure_collections']
         self.server_cmd = ['ping', 'register_service']
 
     def submit_message(self, message):
-        command = message[1]
+        command = message[1].lower()
         if command in self.server_cmd:
             getattr(self, command)(self, message)
         elif command in self.worker_cmd:

@@ -36,10 +36,6 @@ class Worker(object):
     def __del__(self):
         self.sock.close()
 
-    def _ensure_collection(self, name, coll_type='IncreaseCollection'):
-        CacheCtl.ensure_collection(name, coll_type)
-        return CacheCtl.collmap[name]
-
     def run(self):
         # register service
         self.sock.send_multipart(['register_service', 'worker', 'READY'])
@@ -59,13 +55,14 @@ class Worker(object):
                 errmsg = '<WORKER> Unknown situation occur: %s', errmsg
                 errlog.error(errmsg)
 
-                response = Response(datas=errmsg, status=message_process_failure)
+                response = Response(datas=err.message,
+                                    status=message_process_failure)
                 self.sock.send_multipart([req.addr, response])
 
     def wping(self):
         return Response(datas='WORKER OK')
 
-    def dumps(self):
+    def dump(self):
         """
         Handles Dumps message command.
         Executes dump operation for all of the collections in CacheCtl.
@@ -84,7 +81,7 @@ class Worker(object):
         value        =>     Data value
         expire       =>     Data expiring time
         """
-        coll = self._ensure_collection(collection)
+        coll = CacheCtl.collmap[collection]
         coll.store(*args, **kwargs)
         return Response(datas='Store OK')
 
@@ -98,7 +95,7 @@ class Worker(object):
         end_time     =>     The end time of the query
         tagging      =>     The tagging of the data
         """
-        coll = self._ensure_collection(collection)
+        coll = CacheCtl.collmap[collection]
         rv = coll.query(*args, **kwargs)
         return Response(datas=list(rv))
 
@@ -112,20 +109,20 @@ class Worker(object):
         d            =>      Should be delete the fetching data
         e            =>      whether only contain the expired data
         """
-        coll = self._ensure_collection(collection)
+        coll = CacheCtl.collmap[collection]
         rv = coll.fetch(*args, **kwargs)
-        return Response(datas=rv)
-
-    def get_collection_info(self, collection):
-        """
-        """
-        pass
+        return Response(datas=list(rv))
 
     def get_collections(self):
         """
         """
         rv = list(CacheCtl.collmap.keys())
         return Response(datas=rv)
+
+    def ensure_collection(self, name, coll_type='IncreaseCollection',
+                          expired=3600):
+        CacheCtl.ensure_collection(name, coll_type, expired)
+        assert name in CacheCtl.collmap
 
     def _gen_response(self, request, cmd_status, cmd_value):
         if cmd_status == FAILURE_STATUS:

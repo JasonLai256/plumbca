@@ -15,8 +15,8 @@ from plumbca import cache
 
 def test_cachectl_basic(rb, cachectl, coll_list):
     for cname in coll_list:
-        cachectl.ensure_collection(cname, 'IncreaseCollection')
-        cachectl.ensure_collection(cname, 'IncreaseCollection')
+        cachectl.ensure_collection(cname, 'IncreaseCollection', 3600)
+        cachectl.ensure_collection(cname, 'IncreaseCollection', 3600)
     assert len(cachectl.collmap) == 5
 
     tagging1, tagging2 = 'admin', 'fortest'
