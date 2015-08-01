@@ -77,6 +77,9 @@ class IncreaseCollection(Collection):
     def __str__(self):
         return self.__repl__()
 
+    def __del__(self):
+        self.dump()
+
     def gen_key_name(self, ts, tagging):
         return '{}:{}'.format(str(ts), tagging)
 
