@@ -1,0 +1,3 @@
+# PlumbCa
+
+PlumbCa 是一个基于 Redis 进行缓存处理的服务器，并通过 zmq 和  msgpack 进行 RPC 通信。

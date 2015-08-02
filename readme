@@ -1,1 +1,3 @@
 # PlumbCa
+
+PlumbCa is a cache server for storing and computing the data base on Redis. The RPC of PlumbCa use zmq and msgpack to communication.
