@@ -11,7 +11,7 @@
 
 import logging
 
-from .helpers import packb, unpackb
+from .helpers import packb, unpackb, frame2str
 from .exceptions import MessageFormatError
 
 
@@ -35,16 +35,19 @@ class Request(object):
     }
     """
     def __init__(self, raw_message):
-        try:
-            self.addr = raw_message[0]
-            self.command = raw_message[1]
-            self._message = unpackb(raw_message[2])
+        self.addr = raw_message[0]
+        self.command = frame2str(raw_message[1])
+        self._message = unpackb(raw_message[2])
 
-            actlog.debug('<Request %s - %s>', self.command, self._message)
-            # __getitem__ will raise if key not exists
+        actlog.debug('<Request %s - %s>', self.command, self._message)
+        # __getitem__ will raise if key not exists
+        print(self._message)
+        if 'args' in self._message:
             self.args = self._message['args']
-        except KeyError:
-            errlog.exception("Invalid request message : %s" % raw_message)
+        elif b'args' in self._message:
+            self.args = self._message[b'args']
+        else:
+            errlog.exception("Invalid request message : ", raw_message)
             raise MessageFormatError("Invalid request message : %r" % raw_message)
 
 

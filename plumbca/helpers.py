@@ -15,8 +15,12 @@ from functools import partial
 from msgpack import packb, unpackb
 
 
-packb = partial(packb, use_bin_type=True)
+packb = partial(packb)
 unpackb = partial(unpackb, encoding='utf-8')
+
+
+def frame2str(frame):
+    return frame.bytes.decode('utf8').lower()
 
 
 def find_eq(a, x, ret_index=False):

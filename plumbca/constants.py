@@ -11,6 +11,8 @@
 
 import zmq
 
+import plumbca.log
 
-BACKEND_IPC = 'ipc://plumbca.ipc'
+
+BACKEND_IPC = 'inproc://plumbca'
 ZCONTEXT = zmq.Context()
