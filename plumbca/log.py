@@ -44,6 +44,14 @@ LOGGING = {
             'backupCount': 9,
             'maxBytes': 52428800
         },
+        'writing_rotating_file': {
+            'level': 'DEBUG',
+            'class': 'logging.handlers.RotatingFileHandler',
+            'formatter': 'simple',
+            'filename': DefaultConf['write_log'],
+            'backupCount': 19,
+            'maxBytes': 52428800
+        },
         'errors_rotating_file': {
             'level': 'ERROR',
             'class': 'logging.handlers.RotatingFileHandler',
@@ -54,6 +62,11 @@ LOGGING = {
         },
     },
     'loggers': {
+        'write-opes': {
+            'handlers': ['console', 'writing_rotating_file'] if DefaultConf.get('debug', '') == 'yes' else ['writing_rotating_file'],
+            'propagate': True,
+            'level': 'INFO',
+        },
         'activity': {
             'handlers': ['console', 'activity_rotating_file'] if DefaultConf.get('debug', '') == 'yes' else ['activity_rotating_file'],
             'propagate': True,

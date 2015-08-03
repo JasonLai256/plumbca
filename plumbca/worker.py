@@ -22,6 +22,7 @@ from .message import Request, Response, message_process_failure
 from . import constants
 
 
+wrtlog = logging.getLogger('write-opes')
 actlog = logging.getLogger('activity')
 errlog = logging.getLogger('errors')
 
@@ -92,8 +93,8 @@ class Worker(Thread):
         value        =>     Data value
         expire       =>     Data expiring time
         """
-        actlog.info('<WORKER> handling Store command - %s, %s ...',
-                    collection, args[:2])
+        wrtlog.info('<WORKER> handling Store command - %s, %s ... %s ...',
+                    collection, args[:2], len(args[2]))
         coll = CacheCtl.collmap[collection]
         coll.store(*args, **kwargs)
         return Response(datas='Store OK')

@@ -24,6 +24,7 @@ defaults = {
         'transport': 'tcp',
         'unixsocket': '',
         'dumpdir': '/var/lib/plumbca/',
+        'write_log': '/var/log/plumbca/write-opes.log',
         'activity_log': '/var/log/plumbca/plumbca.log',
         'errors_log': '/var/log/plumbca/plumbca_errors.log',
         'mark_version': '1.0',
