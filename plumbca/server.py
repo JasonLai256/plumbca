@@ -44,7 +44,7 @@ class Broker:
 
     def submit_message(self, message):
         command = frame2str(message[1])
-        print(command, type(command))
+        # print(command, type(command))
         if command in self.server_cmd:
             getattr(self, command)(message)
         elif command in self.worker_cmd:
@@ -63,7 +63,6 @@ class Broker:
             aclog.info('Broker register `%s`.', wtype)
         else:
             aclog.info('Forbidden register `%s` in broker.', wtype)
-
 
     def ping(self, msg):
         aclog.info('<Broker> handling PING command.')

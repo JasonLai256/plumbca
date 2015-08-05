@@ -41,7 +41,6 @@ class Request(object):
 
         actlog.debug('<Request %s - %s>', self.command, self._message)
         # __getitem__ will raise if key not exists
-        print(self._message)
         if 'args' in self._message:
             self.args = self._message['args']
         elif b'args' in self._message:

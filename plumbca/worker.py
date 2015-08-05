@@ -52,7 +52,6 @@ class Worker(Thread):
         actlog.info('<WORKER> starting the worker service ...')
         while True:
             try:
-                print('collmap - ', CacheCtl.collmap)
                 poller.poll()
                 msg = self.sock.recv_multipart(copy=False)
                 req = Request(msg)
@@ -146,6 +145,7 @@ class Worker(Thread):
                     name, coll_type, expired)
         CacheCtl.ensure_collection(name, coll_type, expired)
         assert name in CacheCtl.collmap
+        return Response(datas='Ensure OK')
 
     def _gen_response(self, request, cmd_status, cmd_value):
         if cmd_status == FAILURE_STATUS:

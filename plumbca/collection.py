@@ -91,7 +91,7 @@ class IncreaseCollection(Collection):
 
     def load(self):
         rv = self.bk.get_collection_data_index(self)
-        print('coll load -', rv)
+        # print('coll load -', rv)
         self.taggings = set(rv['taggings'])
         self._expire = int(rv['expire'])
         self.itype = rv['type']
@@ -128,6 +128,8 @@ class IncreaseCollection(Collection):
         self.caching[key].
         """
         base = self.bk.inc_coll_caches_get(self, keyname)
+        # print('Store Before `{}` - Origin: {}, Inc: {}'.format(keyname, base,
+        #                                                        inc_value))
         if base:
             base = base[0]
             for k, v in inc_value.items():
@@ -138,7 +140,7 @@ class IncreaseCollection(Collection):
         else:
             base = inc_value
 
-        # print('update -', keyname, base)
+        # print('Store After `{}` - {}'.format(keyname, base))
         self.bk.inc_coll_cache_set(self, keyname, base)
 
     def fetch(self, tagging='__all__', d=True, e=True, expired=None):

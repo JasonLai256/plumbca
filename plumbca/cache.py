@@ -38,7 +38,7 @@ class CacheCtl(object):
         indexes = self.bk.get_collection_indexes()
         if indexes:
             self.collmap = {}
-            print(indexes)
+            # print(indexes)
             for name, klass in indexes.items():
                 actlog.info("Start to restore the collection - %s (%s).", name, klass)
                 self.collmap[name] = globals()[klass](name)
