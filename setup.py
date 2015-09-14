@@ -10,6 +10,7 @@ setup(
     install_requires=[
         'pyzmq',
         'msgpack-python',
+        'redis',
     ],
     scripts=['bin/plumbca-server'],
     packages=find_packages(exclude=["tests"]),
