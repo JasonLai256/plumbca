@@ -19,10 +19,11 @@ setup(
     author_email='jasonlai256@gmail.com',
     description='.',
     classifiers=[
-        'Development Status :: 4 - beta',
+        'Development Status :: 4 - Beta',
         'Intended Audience :: Developers',
         'Programming Language :: Python :: 3 :: Only',
         'Programming Language :: Python :: 3.3',
         'Programming Language :: Python :: 3.4',
+        'Programming Language :: Python :: 3.5',
     ]
 )
