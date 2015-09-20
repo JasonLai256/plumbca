@@ -31,9 +31,6 @@ class CacheCtl(object):
         if try_restore:
             self.restore_collections()
 
-    def __del__(self):
-        self.dump_collections()
-
     def restore_collections(self):
         indexes = self.bk.get_collection_indexes()
         if indexes:
