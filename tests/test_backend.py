@@ -160,5 +160,5 @@ def test_redis_backend_inc_coll(rb, fake_coll):
 
     # ---------------- check for the inc_coll_keys_delete ----------------
     assert_cache_size(5, 5)
-    rb.inc_coll_keys_delete(fake_coll, [other_tagging])
+    rb.delete_collection_keys(fake_coll, klass="IncreaseCollection")
     assert_cache_size(0, 0)

@@ -18,7 +18,7 @@ from .helpers import packb, unpackb
 class RedisBackend:
 
     colls_index_fmt = 'plumbca:' + dfconf['mark_version'] + ':collections:index'
-    metadata_fmt = 'plumbca:' + dfconf['mark_version'] + ':md:timeline:{name}'
+    metadata_fmt = 'plumbca:' + dfconf['mark_version'] + ':metadata:timeline:{name}'
     inc_coll_cache_item_fmt = 'plumbca:' + dfconf['mark_version'] + ':cache:{name}'
 
     def __init__(self):
@@ -48,6 +48,19 @@ class RedisBackend:
         if rv:
             return {name.decode("utf-8"): unpackb(info)
                         for name, info in rv.items()}
+
+    def delete_collection_keys(self, coll, klass=''):
+        """ Danger! This method will erasing all values store in the key that
+        should be only use it when you really known what are you doing.
+
+        It is good for the testing to clean up the environment.
+        """
+        md_key = self.metadata_fmt.format(name=coll.name)
+        self.rdb.delete(md_key)
+
+        if klass == 'IncreaseCollection':
+            cache_key = self.inc_coll_cache_item_fmt.format(name=coll.name)
+            self.rdb.delete(cache_key)
 
     def get_collection_length(self, coll, klass=''):
         if not klass:
@@ -219,18 +232,6 @@ class RedisBackend:
     def inc_coll_caches_del(self, coll, *fields):
         key = self.inc_coll_cache_item_fmt.format(name=coll.name)
         return self.rdb.hdel(key, *fields)
-
-    def inc_coll_keys_delete(self, coll, taggings):
-        """ Danger! This method will erasing all values store in the key that
-        should be only use it when you really known what are you doing.
-
-        It is good for the testing to clean up the environment.
-        """
-        for tagging in taggings:
-            md_key = self.metadata_fmt.format(name=coll.name, tagging=tagging)
-            self.rdb.delete(md_key)
-        cache_key = self.inc_coll_cache_item_fmt.format(name=coll.name)
-        self.rdb.delete(cache_key)
 
 
 _backends = {
