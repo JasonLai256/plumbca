@@ -35,6 +35,11 @@ class CollOpeHelper:
 
 
 @pytest.mark.incremental
+def test_increse_collection_basic(rb, icoll):
+    assert str(icoll) == '<IncreaseCollection - foo> . inc'
+
+
+@pytest.mark.incremental
 def test_increse_collection_store(rb, icoll, tag_list):
     '''testing the store method of the IncreseCollection.'''
     for i, t in enumerate(tag_list, 1):
@@ -54,10 +59,9 @@ def test_increse_collection_store(rb, icoll, tag_list):
                 assert rv and rv[0] == {'bar': 1}
 
         # check the size of items of the collection.tagging
-        rv = rb.get_collection_length(icoll, tagging)
-        assert rv[0] == len(tslist) * i
-        tagging_info = rv[1]
-        assert tagging_info[1] == tagging_info[2] == len(tslist)
+        _md_len, _cache_len = rb.get_collection_length(icoll, klass="IncreaseCollection")
+        assert _md_len == len(tslist)
+        assert _cache_len == len(tslist) * i
 
 
 # @pytest.mark.incremental
@@ -114,83 +118,98 @@ def test_increse_collection_fetch(rb, icoll, tag_list):
         rv = list(icoll.fetch(tagging=tagging, d=False, e=False))
         assert len(rv) == 5
 
-        rv = rb.get_collection_length(icoll, tagging)
-        assert rv[0] == 5 * i
-        tagging_info = rv[1]
-        assert tagging_info[1] == tagging_info[2] == 5
+        _md_len, _cache_len = rb.get_collection_length(icoll,
+                                                       klass="IncreaseCollection")
+        assert _md_len == 5
+        assert _cache_len == 5 * i
 
+    # - 1 -
     rv = list(icoll.fetch(d=False, expired=e+130))
     assert len(rv) == 2 * i
 
+    # - 2 -
     rv = list(icoll.fetch(d=False, e=False))
     assert len(rv) == 5 * i
-    rv = rb.get_collection_length(icoll, tagging)
-    assert rv[0] == 5 * i
-    assert rv[1][1] == rv[1][2] == len(tslist)
+    _md_len, _cache_len = rb.get_collection_length(icoll,
+                                                   klass="IncreaseCollection")
+    assert _md_len == 5
+    assert _cache_len == 5 * i
 
+    # - 3 -
     rv = list(icoll.fetch(expired=e+130))
     assert len(rv) == 2 * i
-    rv = rb.get_collection_length(icoll, tagging)
-    assert rv[0] == 3 * i
-    assert rv[1][1] == rv[1][2] == len(tslist) - 2
+    _md_len, _cache_len = rb.get_collection_length(icoll,
+                                                   klass="IncreaseCollection")
+    assert _md_len == 3
+    assert _cache_len == 3 * i
 
+    # - 4 -
     rv = list(icoll.fetch())
     assert len(rv) == 3 * i
-    rv = rb.get_collection_length(icoll, tagging)
-    assert rv[0] == 0
-    assert rv[1][1] == rv[1][2] == 0
+    _md_len, _cache_len = rb.get_collection_length(icoll,
+                                                   klass="IncreaseCollection")
+    assert _md_len == 0
+    assert _cache_len == 0
+
+    # - 5 -
+    assert list(icoll.fetch(tagging='not-exists')) == []
 
 
-@pytest.mark.incremental
-def test_increse_collection_dump_load(rb, icoll, icoll2):
-    assert icoll.itype == 'inc'
-    assert icoll2.itype == 'max'
-    assert str(icoll) == '<IncreaseCollection - foo> . inc'
-    assert str(icoll2) == '<IncreaseCollection - bar> . max'
+# @pytest.mark.incremental
+# def test_increse_collection_dump_load(rb, icoll, icoll2):
+#     assert icoll.itype == 'inc'
+#     assert icoll2.itype == 'max'
+#     assert str(icoll) == '<IncreaseCollection - foo> . inc'
+#     assert str(icoll2) == '<IncreaseCollection - bar> . max'
 
-    CollOpeHelper.icoll_insert_data(icoll)
-    icoll.dump()
-    icoll2.name = icoll.name
-    icoll2.load()
-    assert icoll.taggings == icoll2.taggings
-    assert icoll._expire == icoll2._expire
-    assert icoll.itype == icoll2.itype
-    assert icoll.ifunc(1, 2) == icoll2.ifunc(1, 2)
-    assert rb.get_collection_length(icoll, 'foo') == \
-        rb.get_collection_length(icoll2, 'foo')
+#     CollOpeHelper.icoll_insert_data(icoll)
+#     icoll.dump()
+#     icoll2.name = icoll.name
+#     icoll2.load()
+#     assert icoll.taggings == icoll2.taggings
+#     assert icoll._expire == icoll2._expire
+#     assert icoll.itype == icoll2.itype
+#     assert icoll.ifunc(1, 2) == icoll2.ifunc(1, 2)
+#     assert rb.get_collection_length(icoll, 'foo') == \
+#         rb.get_collection_length(icoll2, 'foo')
 
-    tag_list = ['foo', 'bar', 'bin', 'jack', 'bob', 'sys', 'usr', 'var', 'etc']
-    for i, t in enumerate(tag_list, 1):
-        CollOpeHelper.icoll_insert_data(icoll, t)
-    icoll.dump()
-    icoll2.load()
-    assert icoll.taggings == icoll2.taggings
-    assert icoll._expire == icoll2._expire
-    assert icoll.itype == icoll2.itype
-    assert icoll.ifunc(1, 2) == icoll2.ifunc(1, 2)
-    assert rb.get_collection_length(icoll, 'foo') == \
-        rb.get_collection_length(icoll2, 'foo')
+#     tag_list = ['foo', 'bar', 'bin', 'jack', 'bob', 'sys', 'usr', 'var', 'etc']
+#     for i, t in enumerate(tag_list, 1):
+#         CollOpeHelper.icoll_insert_data(icoll, t)
+#     icoll.dump()
+#     icoll2.load()
+#     assert icoll.taggings == icoll2.taggings
+#     assert icoll._expire == icoll2._expire
+#     assert icoll.itype == icoll2.itype
+#     assert icoll.ifunc(1, 2) == icoll2.ifunc(1, 2)
+#     assert rb.get_collection_length(icoll, 'foo') == \
+#         rb.get_collection_length(icoll2, 'foo')
 
 
 @pytest.mark.incremental
 def test_increse_collection_batch_opes(rb, icoll, icoll2):
-    tslist, tagging = CollOpeHelper.icoll_insert_data(icoll)
-    for i in range(128):
+    for i in range(1, 65):
         t = 'test{}'.format(i)
-        CollOpeHelper.icoll_insert_data(icoll, t)
-        assert len(list(icoll.query(10, 1000, tagging))) == 5
-        assert tagging in icoll.taggings
-        rv = rb.get_collection_length(icoll, t)
-        assert rv[0] == len(tslist) * (i + 2)
-        assert rv[1][1] == rv[1][2] == len(tslist)
+        tslist, tagging = CollOpeHelper.icoll_insert_data(icoll, t)
 
-    icoll.dump()
-    icoll2.name = icoll.name
-    icoll2.load()
-    assert icoll.taggings == icoll2.taggings
-    assert icoll._expire == icoll2._expire
-    assert icoll.itype == icoll2.itype
-    assert icoll.ifunc(1, 2) == icoll2.ifunc(1, 2)
-    for t in icoll2.taggings:
-        assert rb.get_collection_length(icoll, t) == \
-            rb.get_collection_length(icoll2, t)
+        # check fetch (no delete, no expire)
+        rv = list(icoll.fetch(d=False, e=False))
+        assert len(rv) == len(tslist) * i
+
+        # check query
+        assert len(list(icoll.query(10, 1000, tagging))) == len(tslist)
+        assert tagging in icoll.taggings
+
+        # check length
+        _md_len, _cache_len = rb.get_collection_length(icoll, klass="IncreaseCollection")
+        assert _md_len == len(tslist)
+        assert _cache_len == len(tslist) * i
+
+    for i in range(1, 33):
+        t = 'test{}'.format(i)
+        rv = list(icoll.fetch(tagging=t))
+        assert len(rv) == len(tslist)
+
+        _md_len, _cache_len = rb.get_collection_length(icoll, klass="IncreaseCollection")
+        assert _md_len == len(tslist)
+        assert _cache_len == len(tslist) * (64 - i)

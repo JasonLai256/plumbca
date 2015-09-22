@@ -93,7 +93,6 @@ class RedisBackend:
         md_key = self.metadata_fmt.format(name=coll.name)
         # Ensure the item of the specific `ts` whether it's exists or not,
         element = self.rdb.zrangebyscore(md_key, ts, ts)
-        # print('element - ', element)
 
         if element:
             info = unpackb(element[0])
@@ -105,33 +104,44 @@ class RedisBackend:
             p = self.rdb.pipeline()
             p.zremrangebyscore(md_key, ts, ts)
             p.zadd(md_key, ts, packb(info))
-            # print('if - ', info)
             p.execute()
 
         else:
             info = {tagging: [expts] + list(args)}
-            # print('else - ', info)
             self.rdb.zadd(md_key, ts, packb(info))
         # print('-'*10)
         # print(tagging)
         # print(self.rdb.zrange(md_key, 0, -1, withscores=True))
         # print('+'*10)
 
+    def del_collection_metadata_by_items(self, coll, tagging, items):
+        """Delete the items of the metadata with the privided timestamp list.
+
+        :param items: the items query from metadata, structure should be equal
+                      to the format of the metadata query that specified tagging.
+        """
+        md_key = self.metadata_fmt.format(name=coll.name)
+        self._del_collection_metadata(md_key, tagging, items)
+
     def del_collection_metadata_by_range(self, coll, tagging, start, end):
-        """ Delete the items of the timeline metadata with the privided
-        start time and end time arguments.
+        """Delete the items of the metadata with the privided start time and
+        end time arguments.
         """
         md_key = self.metadata_fmt.format(name=coll.name)
         elements = self.rdb.zrangebyscore(md_key, start, end, withscores=True)
         if not elements:
             return
 
+        self._del_collection_metadata(md_key, tagging, elements)
+
+    def _del_collection_metadata(self, key, tagging, elements):
         del_info_todos = []
         del_key_todos = []
 
         # searching what elements need te be handle
         for info, ts in elements:
-            info = unpackb(info)
+            if isinstance(info, bytes):
+                info = unpackb(info)
             if tagging not in info:
                 continue
             info.pop(tagging)
@@ -145,18 +155,19 @@ class RedisBackend:
         # doing the operations that update keys one by one atomically
         for info, ts in del_info_todos:
             p = self.rdb.pipeline()
-            p.zremrangebyscore(md_key, ts, ts)
-            p.zadd(md_key, ts, packb(info))
+            p.zremrangebyscore(key, ts, ts)
+            p.zadd(key, ts, packb(info))
             p.execute()
 
         # doing the operations that remove all keys atomically
         p = self.rdb.pipeline()
         for ts in del_key_todos:
-            p.zremrangebyscore(md_key, ts, ts)
+            p.zremrangebyscore(key, ts, ts)
         p.execute()
 
-    def query_collection_metadata(self, coll, tagging, start, end):
-        return self._query_collection_metadata(coll, start, end, tagging)
+    def query_collection_metadata(self, coll, tagging, start, end, ret_whold=False):
+        return self._query_collection_metadata(coll, start, end,
+                                               tagging, ret_whold)
 
     def query_collection_metadata_tagging(self, coll, start, end):
         return self._query_collection_metadata(coll, start, end, '__taggings__')
@@ -164,8 +175,14 @@ class RedisBackend:
     def query_collection_metadata_all(self, coll, start, end):
         return self._query_collection_metadata(coll, start, end, '__all__')
 
-    def _query_collection_metadata(self, coll, start, end, tagging=''):
+    def _query_collection_metadata(self, coll, start, end, tagging='', ret_whold=False):
         """ Do the real operations for query metadata from the redis.
+
+        :param coll: the collection class use to fetch name
+        :param start: the start time of the query
+        :param end: the end time of the query
+        :param tagging: the tagging for query
+        :param ret_whold: whether return all the info when specified a tagging
 
         :ret: return None if no data exists.
               If tagging is specified '__taggings__', return value only contain the taggings:
@@ -185,8 +202,15 @@ class RedisBackend:
                       tsN: {tagging1: info1, tagging2: info2, ...},
                   }
               If tagging is specified other, return value is the info that match the tagging:
-                  # value, score
-                  [(ts1, info1), (ts2, info2), ... (tsN, infoN)]
+                  # value, score if ret_whold == False
+                  [(info1, ts1), (info2, ts2), ... (infoN, tsN)]
+                  # else:
+                  [
+                      ({tagging1: info1, tagging2: info2, ...}, ts1),
+                      ({tagging1: info1, tagging2: info2, ...}, ts2),
+                      ...
+                      ({tagging1: info1, tagging2: info2, ...}, tsN),
+                  ]
         """
         md_key = self.metadata_fmt.format(name=coll.name)
         elements = self.rdb.zrangebyscore(md_key, start, end, withscores=True)
@@ -201,13 +225,15 @@ class RedisBackend:
         # searching what elements should be match
         for info, ts in elements:
             info = unpackb(info)
-            # print(tagging, info)
             if tagging == '__taggings__':
                 rv[ts] = list(info.keys())
             elif tagging == '__all__':
                 rv[ts] = info
             elif tagging in info:
-                rv.append((ts, info[tagging]))
+                if ret_whold:
+                    rv.append((info, ts))
+                else:
+                    rv.append((info[tagging], ts))
 
         return rv
 

@@ -60,7 +60,6 @@ class IncreaseCollection(Collection):
         self._metadata = {}
         self.caching = {}
         self.taggings = set()
-        self._info = {}
         # the expire should be unchangable in the instance live time
         self._expire = int(expire)
         self.itype = itype
@@ -77,32 +76,14 @@ class IncreaseCollection(Collection):
     def __str__(self):
         return self.__repl__()
 
-    def __del__(self):
-        self.dump()
-
     def gen_key_name(self, ts, tagging):
         return '{}:{}'.format(str(ts), tagging)
-
-    def info(self):
-        return self._info
-
-    def dump(self):
-        self.bk.set_collection_data_index(self)
-
-    def load(self):
-        rv = self.bk.get_collection_data_index(self)
-        # print('coll load -', rv)
-        self.taggings = set(rv['taggings'])
-        self._expire = int(rv['expire'])
-        self.itype = rv['type']
-        self.ifunc = self.opes[self.itype]
 
     def query(self, stime, etime, tagging):
         if stime > etime or tagging not in self.taggings:
             return
 
-        mds = self.bk.inc_coll_timeline_metadata_query(self, tagging,
-                                                       stime, etime)
+        mds = self.bk.query_collection_metadata(self, tagging, stime, etime)
         if not mds:
             return
 
@@ -110,17 +91,19 @@ class IncreaseCollection(Collection):
         keys = [self.gen_key_name(ts, tagging) for ts in tslist]
         return zip(keys, self.bk.inc_coll_caches_get(self, *keys))
 
-    def store(self, ts, tagging, value, expire_from_now=False):
+    def store(self, ts, tagging, value, abselute_expire=None, expire_from_now=False):
         if not isinstance(value, dict):
             raise ValueError('The IncreaseCollection only accept Dict type value.')
         self.taggings.add(tagging)
         ts = int(ts)
-        if expire_from_now:
+        if abselute_expire:
+            expire = int(abselute_expire)
+        elif expire_from_now:
             expire = int(time.time()) + self._expire
         else:
             expire = ts + self._expire
         keyname = self.gen_key_name(ts, tagging)
-        self.bk.inc_coll_metadata_set(self, tagging, expire, ts)
+        self.bk.set_collection_metadata(self, tagging, expire, ts)
         self._update_value(keyname, value)
 
     def _update_value(self, keyname, inc_value):
@@ -171,19 +154,24 @@ class IncreaseCollection(Collection):
             yield from self._fetch_expired(sentinel, tagging, d)
 
     def _fetch_expired(self, sentinel, tagging, d):
-        mds = self.bk.inc_coll_expire_metadata_query(self, tagging, sentinel)
+        mds = self.bk.query_collection_metadata(self, tagging, 0, sentinel,
+                                                ret_whold=True)
+        if not mds:
+            return
+
         # get the expire_time and ts values.
-        ts = [ex[0][0] for ex in mds]
-        keys = [self.gen_key_name(t, tagging) for t in ts]
+        # Must be konwn that show below:
+        #     item[0][tagging][0] => the specified tagging expire_time
+        #     item[1] => timestamp of current handling metadata
+        expire_items = [item for item in mds
+                            if int(item[0][tagging][0]) < sentinel]
+        tslist = [int(item[1]) for item in expire_items]
+        keys = [self.gen_key_name(t, tagging) for t in tslist]
         rv = self.bk.inc_coll_caches_get(self, *keys)
 
         # remove all the expired metadata and the cache items
         if d and rv:
-            exps = [int(ex[1]) for ex in mds]
-            expired_sentinel = max(exp for exp in exps) + 1
-            self.bk.inc_coll_timeline_metadata_del(self, tagging, *exps)
-            self.bk.inc_coll_expire_metadata_del(self, tagging,
-                                                 expired_sentinel)
+            self.bk.del_collection_metadata_by_items(self, tagging, expire_items)
             self.bk.inc_coll_caches_del(self, *keys)
 
         return zip(keys, rv)

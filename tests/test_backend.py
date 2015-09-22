@@ -48,7 +48,7 @@ def test_redis_backend_metadata(rb, fake_coll):
 
         rv = rb.query_collection_metadata(fake_coll, t, 0, 1000)
         assert len(rv) == i
-        assert rv[i-1] == (ts, [exp] + args)
+        assert rv[i-1] == ([exp] + args, ts)
         rv = rb.query_collection_metadata_tagging(fake_coll, 0, 1000)
         assert len(rv) == i
         assert len(rv[ts]) == len(taggings)
