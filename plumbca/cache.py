@@ -24,30 +24,10 @@ err_logger = logging.getLogger('errors')
 
 class CacheCtl(object):
 
-    def __init__(self, try_restore=True):
+    def __init__(self):
         self.collmap = {}
         self.info = {}
         self.bk = BackendFactory(DefaultConf['backend'])
-        if try_restore:
-            self.restore_collections()
-
-    def restore_collections(self):
-        indexes = self.bk.get_collection_indexes()
-        if indexes:
-            self.collmap = {}
-            # print(indexes)
-            for name, klass in indexes.items():
-                actlog.info("Start to restore the collection - %s (%s).", name, klass)
-                self.collmap[name] = globals()[klass](name)
-                self.collmap[name].load()
-                actlog.info("Successful restore the `%s` collection.", name)
-
-    def dump_collections(self):
-        self.bk.set_collection_indexes(self)
-        for collection in self.collmap.values():
-            actlog.info("Start to dump `%s` collection.", collection)
-            collection.dump()
-            actlog.info("Successful dumped `%s` collection.", collection)
 
     def get_collection(self, name):
         if name not in self.collmap:
@@ -57,11 +37,27 @@ class CacheCtl(object):
         return self.collmap[name]
 
     def ensure_collection(self, name, ctype, expire, **kwargs):
-        if name not in self.collmap:
+        rv = self.bk.get_collection_index(name)
+
+        if name not in self.collmap and not rv:
             self.collmap[name] = globals()[ctype](name, expire=expire, **kwargs)
-            self.bk.set_collection_indexes(self)
-            actlog.info("Ensure collection not exists, create it, `%s`.",
-                        self.collmap[name])
+            self.bk.set_collection_index(name, self.collmap[name])
+            actlog.info("Ensure collection - not exists in plumbca and redis, "
+                        "create it, `%s`.", self.collmap[name])
+
+        elif name not in self.collmap and rv:
+            rv_name, rv_instance_name = rv
+            assert name == rv_name
+            assert rv_instance_name == globals()[ctype].__class__.__name__
+            self.collmap[name] = globals()[ctype](name, expire=expire, **kwargs)
+            actlog.info("Ensure collection - not exists in plumbca, "
+                        "create it, `%s`.", self.collmap[name])
+
+        elif name in self.collmap and not rv:
+            self.bk.set_collection_index(name, self.collmap[name])
+            actlog.info("Ensure collection - not exists in redis, "
+                        "create it, `%s`.", self.collmap[name])
+
         else:
             actlog.info("Ensure collection already exists, `%s`.",
                         self.collmap[name])

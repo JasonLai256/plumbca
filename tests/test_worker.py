@@ -11,7 +11,7 @@ import pytest
 
 from plumbca.worker import Worker
 from plumbca.message import message_process_success
-from plumbca.helpers import packb, unpackb
+from plumbca.helpers import unpackb
 
 
 @pytest.mark.incremental

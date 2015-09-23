@@ -157,7 +157,7 @@ class IncreaseCollection(Collection):
         mds = self.bk.query_collection_metadata(self, tagging, 0, sentinel,
                                                 ret_whold=True)
         if not mds:
-            return
+            return []
 
         # get the expire_time and ts values.
         # Must be konwn that show below:

@@ -78,7 +78,7 @@ class Worker(Thread):
         Executes dump operation for all of the collections in CacheCtl.
         """
         actlog.info('<WORKER> handling Dump command ...')
-        CacheCtl.dump_collections()
+        # Nothing todo
         return Response(datas='DUMP OK')
 
     def store(self, collection, *args, **kwargs):
@@ -94,7 +94,7 @@ class Worker(Thread):
         """
         wrtlog.info('<WORKER> handling Store command - %s, %s ... %s ...',
                     collection, args[:2], len(args[2]))
-        coll = CacheCtl.collmap[collection]
+        coll = CacheCtl.get_collection(collection)
         coll.store(*args, **kwargs)
         return Response(datas='Store OK')
 
@@ -110,7 +110,7 @@ class Worker(Thread):
         """
         actlog.info('<WORKER> handling Query command - %s, %s ...',
                     collection, args)
-        coll = CacheCtl.collmap[collection]
+        coll = CacheCtl.get_collection(collection)
         rv = coll.query(*args, **kwargs)
         rv = list(rv) if rv else []
         return Response(datas=rv)
@@ -127,7 +127,7 @@ class Worker(Thread):
         """
         actlog.info('<WORKER> handling Fetch command - %s, %s ...',
                     collection, args)
-        coll = CacheCtl.collmap[collection]
+        coll = CacheCtl.get_collection(collection)
         rv = coll.fetch(*args, **kwargs)
         rv = list(rv) if rv else []
         return Response(datas=rv)
