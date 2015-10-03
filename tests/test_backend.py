@@ -211,6 +211,11 @@ def test_redis_backend_sorted_count_coll(rb, fake_coll):
     for item in rv:
         assert item == v2
 
+    rv = rb.sorted_count_coll_cache_get(fake_coll, tagging,
+                                        timestamps, topN=100)
+    for item in rv:
+        assert item == v2[100:]
+
     # ---------------- check for the operation of deleting ----------------
     rv = rb.sorted_count_coll_cache_del(fake_coll, tagging, timestamps[0:1])
     assert rv == 1
