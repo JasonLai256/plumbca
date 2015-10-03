@@ -19,7 +19,11 @@ class RedisBackend:
 
     colls_index_fmt = 'plumbca:' + dfconf['mark_version'] + ':collections:index'
     metadata_fmt = 'plumbca:' + dfconf['mark_version'] + ':metadata:timeline:{name}'
-    inc_coll_cache_item_fmt = 'plumbca:' + dfconf['mark_version'] + ':cache:{name}'
+    inc_coll_cache_fmt = 'plumbca:' + dfconf['mark_version'] + ':cache:{name}'
+    sorted_count_coll_cache_fmt = 'plumbca:' + dfconf['mark_version'] + \
+                                  ':sorted:count:cache:{name}:{tagging}:{ts}'
+    unique_count_coll_cache_fmt = 'plumbca:' + dfconf['mark_version'] + \
+                                  ':unique:count:cache:{name}:{tagging}:{ts}'
 
     def __init__(self):
         self.rdb = StrictRedis(host=rdconf['host'], port=rdconf['port'],
@@ -59,7 +63,7 @@ class RedisBackend:
         self.rdb.delete(md_key)
 
         if klass == 'IncreaseCollection':
-            cache_key = self.inc_coll_cache_item_fmt.format(name=coll.name)
+            cache_key = self.inc_coll_cache_fmt.format(name=coll.name)
             self.rdb.delete(cache_key)
 
     def get_collection_length(self, coll, klass=''):
@@ -73,7 +77,7 @@ class RedisBackend:
         # print('** TL -', self.rdb.zrange(md_key, 0, -1, withscores=True))
 
         if klass == 'IncreaseCollection':
-            cache_key = self.inc_coll_cache_item_fmt.format(name=coll.name)
+            cache_key = self.inc_coll_cache_fmt.format(name=coll.name)
             cache_len = self.rdb.hlen(cache_key)
             # notice that the cache_len is the length of all the items in cache_key
             rv.append(cache_len)
@@ -238,7 +242,7 @@ class RedisBackend:
         return rv
 
     def inc_coll_cache_set(self, coll, field, value):
-        key = self.inc_coll_cache_item_fmt.format(name=coll.name)
+        key = self.inc_coll_cache_fmt.format(name=coll.name)
         self.rdb.hset(key, field, packb(value))
 
     def inc_coll_caches_get(self, coll, *fields):
@@ -249,15 +253,82 @@ class RedisBackend:
         if not fields:
             return []
 
-        key = self.inc_coll_cache_item_fmt.format(name=coll.name)
+        key = self.inc_coll_cache_fmt.format(name=coll.name)
         rv = self.rdb.hmget(key, *fields)
         # print('inc_coll_caches_get - ', rv)
         # print('inc_coll_caches_get After - ', [unpackb(r) for r in rv if r])
         return [unpackb(r) for r in rv if r]
 
     def inc_coll_caches_del(self, coll, *fields):
-        key = self.inc_coll_cache_item_fmt.format(name=coll.name)
+        key = self.inc_coll_cache_fmt.format(name=coll.name)
         return self.rdb.hdel(key, *fields)
+
+    def uniq_count_coll_cache_set(self, coll, ts, tagging, values):
+        """
+        :param values: should be a iterable object contain members
+        """
+        values = {packb(v) for v in values}
+        key_fmt = self.unique_count_coll_cache_fmt
+        key = key_fmt.format(name=coll.name, tagging=tagging, ts=ts)
+        return self.rdb.sadd(key, *values)
+
+    def uniq_count_coll_cache_get(self, coll, tagging, timestamps):
+        key_fmt = self.unique_count_coll_cache_fmt
+        rv = []
+        for ts in timestamps:
+            key = key_fmt.format(name=coll.name, tagging=tagging, ts=ts)
+            members = self.rdb.smembers(key)
+            rv.append({unpackb(m) for m in members})
+        return rv
+
+    def uniq_count_coll_cache_del(self, coll, tagging, timestamps):
+        keys = self._gen_count_keys(coll.name, tagging,
+                                    'unique_count', timestamps)
+        return self.rdb.delete(*keys)
+
+    def sorted_count_coll_cache_set(self, coll, ts, tagging, values):
+        """
+        :param values: should be a dict of <member: score> pair
+        """
+        key_fmt = self.sorted_count_coll_cache_fmt
+        key = key_fmt.format(name=coll.name, tagging=tagging, ts=ts)
+        add_val = []
+        for member, score in values.items():
+            add_val.append(score)
+            add_val.append(packb(member))
+        return self.rdb.zadd(key, *add_val)
+
+    def sorted_count_coll_cache_get(self, coll, tagging, timestamps, topN=None):
+        key_fmt = self.sorted_count_coll_cache_fmt
+        rv = []
+        for ts in timestamps:
+            key = key_fmt.format(name=coll.name, tagging=tagging, ts=ts)
+            if topN:
+                elements = self.rdb.zrange(key, -topN, -1, withscores=True)
+            else:
+                elements = self.rdb.zrange(key, 0, -1, withscores=True)
+            rv.append([(unpackb(member), score) for member, score in elements])
+        # import pprint
+        # pprint.pprint(rv)
+        return rv
+
+    def sorted_count_coll_cache_del(self, coll, tagging, timestamps):
+        keys = self._gen_count_keys(coll.name, tagging,
+                                    'sorted_count', timestamps)
+        return self.rdb.delete(*keys)
+
+    def _gen_count_keys(self, name, tagging, cachetype, timestamps):
+        if cachetype == 'unique_count':
+            key_fmt = self.unique_count_coll_cache_fmt
+        elif cachetype == 'sorted_count':
+            key_fmt = self.sorted_count_coll_cache_fmt
+
+        keys = []
+        for ts in timestamps:
+            k = key_fmt.format(name=name, tagging=tagging, ts=ts)
+            keys.append(k)
+
+        return keys
 
 
 _backends = {

@@ -107,12 +107,12 @@ def test_redis_backend_metadata(rb, fake_coll):
     assert rb.query_collection_metadata_all(fake_coll, 9999, 9999) is None
 
 
-def _add_item(rb, coll, tagging, ts, value):
+def _add_inc_coll_item(rb, coll, tagging, ts, value):
     rb.set_collection_metadata(coll, tagging, ts+100, ts)
-    rb.inc_coll_cache_set(coll, _mk_field(tagging, ts), value)
+    rb.inc_coll_cache_set(coll, _mk_inc_coll_field(tagging, ts), value)
 
 
-def _mk_field(tagging, ts):
+def _mk_inc_coll_field(tagging, ts):
     field_key = '{}:{}'.format(ts, tagging)
     return field_key
 
@@ -131,19 +131,19 @@ def test_redis_backend_inc_coll(rb, fake_coll):
 
     # ---------------- check the operation of item adding ----------------
     for ts in timestamps:
-        _add_item(rb, fake_coll, tagging, ts, v)
+        _add_inc_coll_item(rb, fake_coll, tagging, ts, v)
     # double adding for checking the logic of duplacate handle
     for ts in timestamps:
-        _add_item(rb, fake_coll, tagging, ts, v)
+        _add_inc_coll_item(rb, fake_coll, tagging, ts, v)
     # adding the other_tagging for the cache size check below
     for ts in timestamps:
-        _add_item(rb, fake_coll, other_tagging, ts, v)
+        _add_inc_coll_item(rb, fake_coll, other_tagging, ts, v)
     print('Success Adding datas...\n\n\n')
 
     assert_cache_size(10, 5)
 
     # ------------------ check the cache data get operations ------------------
-    fields = [_mk_field(tagging, ts) for ts in timestamps]
+    fields = [_mk_inc_coll_field(tagging, ts) for ts in timestamps]
     rv = rb.inc_coll_caches_get(fake_coll, *fields)
     for r in rv:
         assert r == v
@@ -162,3 +162,65 @@ def test_redis_backend_inc_coll(rb, fake_coll):
     assert_cache_size(5, 5)
     rb.delete_collection_keys(fake_coll, klass="IncreaseCollection")
     assert_cache_size(0, 0)
+
+
+def test_redis_backend_unique_count_coll(rb, fake_coll):
+    tagging = 'day'
+    v = {fake.uuid4() for i in range(200)}
+    timestamps = [100, 200, 300]
+
+    # ----------- check the operation of item adding and getting ----------
+    for ts in timestamps:
+        rv = rb.uniq_count_coll_cache_set(fake_coll, ts, tagging, v)
+        assert rv == 200
+        rv = rb.uniq_count_coll_cache_set(fake_coll, ts, tagging, v)
+        assert rv == 0
+
+    rv = rb.uniq_count_coll_cache_get(fake_coll, tagging, timestamps)
+    for item in rv:
+        assert item == v
+
+    # ---------------- check for the operation of deleting ----------------
+    rv = rb.uniq_count_coll_cache_del(fake_coll, tagging, timestamps[0:1])
+    assert rv == 1
+    rv = rb.uniq_count_coll_cache_get(fake_coll, tagging, timestamps[0:1])
+    assert rv == [set()]
+    rv = rb.uniq_count_coll_cache_get(fake_coll, tagging, timestamps[1:])
+    for item in rv:
+        assert item == v
+
+    rv = rb.uniq_count_coll_cache_del(fake_coll, tagging, timestamps[1:])
+    assert rv == 2
+    rv = rb.uniq_count_coll_cache_get(fake_coll, tagging, timestamps)
+    assert rv == [set(), set(), set()]
+
+
+def test_redis_backend_sorted_count_coll(rb, fake_coll):
+    tagging = 'day'
+    v = {fake.uuid4(): i for i in range(200)}
+    v2 = [(member, score) for member, score in v.items()]
+    v2 = sorted(v2, key=lambda x: x[1])
+    timestamps = [100, 200, 300]
+
+    # ----------- check the operation of item adding and getting ----------
+    for ts in timestamps:
+        rv = rb.sorted_count_coll_cache_set(fake_coll, ts, tagging, v)
+        assert rv == 200
+
+    rv = rb.sorted_count_coll_cache_get(fake_coll, tagging, timestamps)
+    for item in rv:
+        assert item == v2
+
+    # ---------------- check for the operation of deleting ----------------
+    rv = rb.sorted_count_coll_cache_del(fake_coll, tagging, timestamps[0:1])
+    assert rv == 1
+    rv = rb.sorted_count_coll_cache_get(fake_coll, tagging, timestamps[0:1])
+    assert rv == [[]]
+    rv = rb.sorted_count_coll_cache_get(fake_coll, tagging, timestamps[1:])
+    for item in rv:
+        assert item == v2
+
+    rv = rb.sorted_count_coll_cache_del(fake_coll, tagging, timestamps[1:])
+    assert rv == 2
+    rv = rb.sorted_count_coll_cache_get(fake_coll, tagging, timestamps)
+    assert rv == [[], [], []]

@@ -188,7 +188,7 @@ def test_increse_collection_fetch(rb, icoll, tag_list):
 
 @pytest.mark.incremental
 def test_increse_collection_batch_opes(rb, icoll, icoll2):
-    for i in range(1, 65):
+    for i in range(1, 17):
         t = 'test{}'.format(i)
         tslist, tagging = CollOpeHelper.icoll_insert_data(icoll, t)
 
@@ -205,11 +205,11 @@ def test_increse_collection_batch_opes(rb, icoll, icoll2):
         assert _md_len == len(tslist)
         assert _cache_len == len(tslist) * i
 
-    for i in range(1, 33):
+    for i in range(1, 9):
         t = 'test{}'.format(i)
         rv = list(icoll.fetch(tagging=t))
         assert len(rv) == len(tslist)
 
         _md_len, _cache_len = rb.get_collection_length(icoll, klass="IncreaseCollection")
         assert _md_len == len(tslist)
-        assert _cache_len == len(tslist) * (64 - i)
+        assert _cache_len == len(tslist) * (16 - i)
