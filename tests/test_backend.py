@@ -165,20 +165,27 @@ def test_redis_backend_inc_coll(rb, fake_coll):
 
 
 def test_redis_backend_unique_count_coll(rb, fake_coll):
+    items_num = 200
     tagging = 'day'
-    v = {fake.uuid4() for i in range(200)}
+    v = {fake.uuid4() for i in range(items_num)}
     timestamps = [100, 200, 300]
 
     # ----------- check the operation of item adding and getting ----------
     for ts in timestamps:
         rv = rb.uniq_count_coll_cache_set(fake_coll, ts, tagging, v)
-        assert rv == 200
+        assert rv == items_num
         rv = rb.uniq_count_coll_cache_set(fake_coll, ts, tagging, v)
         assert rv == 0
 
     rv = rb.uniq_count_coll_cache_get(fake_coll, tagging, timestamps)
     for item in rv:
         assert item == v
+        assert len(item) == items_num
+
+    rv = rb.uniq_count_coll_cache_get(fake_coll, tagging,
+                                      timestamps, count_only=True)
+    for count in rv:
+        assert count == items_num
 
     # ---------------- check for the operation of deleting ----------------
     rv = rb.uniq_count_coll_cache_del(fake_coll, tagging, timestamps[0:1])
@@ -188,7 +195,17 @@ def test_redis_backend_unique_count_coll(rb, fake_coll):
     rv = rb.uniq_count_coll_cache_get(fake_coll, tagging, timestamps[1:])
     for item in rv:
         assert item == v
+        assert len(item) == items_num
 
+    # uniq_count_coll_cache_pop 50 items
+    rv = rb.uniq_count_coll_cache_pop(fake_coll, tagging, timestamps[1:], 50)
+    for item in rv:
+        assert len(item) == 50
+    rv = rb.uniq_count_coll_cache_get(fake_coll, tagging, timestamps[1:])
+    for item in rv:
+        assert len(item) == items_num - 50
+
+    # delete remain items
     rv = rb.uniq_count_coll_cache_del(fake_coll, tagging, timestamps[1:])
     assert rv == 2
     rv = rb.uniq_count_coll_cache_get(fake_coll, tagging, timestamps)

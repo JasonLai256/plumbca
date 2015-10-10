@@ -272,12 +272,34 @@ class RedisBackend:
         key = key_fmt.format(name=coll.name, tagging=tagging, ts=ts)
         return self.rdb.sadd(key, *values)
 
-    def uniq_count_coll_cache_get(self, coll, tagging, timestamps):
+    def uniq_count_coll_cache_get(self, coll, tagging, timestamps, count_only=False):
         key_fmt = self.unique_count_coll_cache_fmt
         rv = []
         for ts in timestamps:
             key = key_fmt.format(name=coll.name, tagging=tagging, ts=ts)
-            members = self.rdb.smembers(key)
+            if count_only:
+                count = self.rdb.scard(key)
+                rv.append(count)
+            else:
+                members = self.rdb.smembers(key)
+                rv.append({unpackb(m) for m in members})
+        return rv
+
+    def uniq_count_coll_cache_pop(self, coll, tagging, timestamps, number):
+        """
+        :note: Redis `SPOP key [count]` command, The count argument will be
+               available in a later version and is not available
+               in 2.6, 2.8, 3.0.
+               Now use SRANDMEMBER and SREM commands to mimic the effect of
+               SPOP count.
+        """
+        key_fmt = self.unique_count_coll_cache_fmt
+        rv = []
+        for ts in timestamps:
+            key = key_fmt.format(name=coll.name, tagging=tagging, ts=ts)
+            # :: srandmember + srem == spop(key, number)
+            members = self.rdb.srandmember(key, number)
+            self.rdb.srem(key, *members)
             rv.append({unpackb(m) for m in members})
         return rv
 

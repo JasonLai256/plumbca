@@ -155,40 +155,13 @@ def test_increse_collection_fetch(rb, icoll, tag_list):
     assert list(icoll.fetch(tagging='not-exists')) == []
 
 
-# @pytest.mark.incremental
-# def test_increse_collection_dump_load(rb, icoll, icoll2):
-#     assert icoll.itype == 'inc'
-#     assert icoll2.itype == 'max'
-#     assert str(icoll) == '<IncreaseCollection - foo> . inc'
-#     assert str(icoll2) == '<IncreaseCollection - bar> . max'
-
-#     CollOpeHelper.icoll_insert_data(icoll)
-#     icoll.dump()
-#     icoll2.name = icoll.name
-#     icoll2.load()
-#     assert icoll.taggings == icoll2.taggings
-#     assert icoll._expire == icoll2._expire
-#     assert icoll.itype == icoll2.itype
-#     assert icoll.ifunc(1, 2) == icoll2.ifunc(1, 2)
-#     assert rb.get_collection_length(icoll, 'foo') == \
-#         rb.get_collection_length(icoll2, 'foo')
-
-#     tag_list = ['foo', 'bar', 'bin', 'jack', 'bob', 'sys', 'usr', 'var', 'etc']
-#     for i, t in enumerate(tag_list, 1):
-#         CollOpeHelper.icoll_insert_data(icoll, t)
-#     icoll.dump()
-#     icoll2.load()
-#     assert icoll.taggings == icoll2.taggings
-#     assert icoll._expire == icoll2._expire
-#     assert icoll.itype == icoll2.itype
-#     assert icoll.ifunc(1, 2) == icoll2.ifunc(1, 2)
-#     assert rb.get_collection_length(icoll, 'foo') == \
-#         rb.get_collection_length(icoll2, 'foo')
-
-
 @pytest.mark.incremental
 def test_increse_collection_batch_opes(rb, icoll, icoll2):
-    for i in range(1, 17):
+    ope_times = 8
+    ope_times_range = ope_times + 1
+    half_ope_times_range = (ope_times // 2) + 1
+
+    for i in range(1, ope_times_range):
         t = 'test{}'.format(i)
         tslist, tagging = CollOpeHelper.icoll_insert_data(icoll, t)
 
@@ -205,11 +178,11 @@ def test_increse_collection_batch_opes(rb, icoll, icoll2):
         assert _md_len == len(tslist)
         assert _cache_len == len(tslist) * i
 
-    for i in range(1, 9):
+    for i in range(1, half_ope_times_range):
         t = 'test{}'.format(i)
         rv = list(icoll.fetch(tagging=t))
         assert len(rv) == len(tslist)
 
         _md_len, _cache_len = rb.get_collection_length(icoll, klass="IncreaseCollection")
         assert _md_len == len(tslist)
-        assert _cache_len == len(tslist) * (16 - i)
+        assert _cache_len == len(tslist) * (ope_times - i)
