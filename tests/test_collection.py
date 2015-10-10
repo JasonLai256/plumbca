@@ -8,6 +8,10 @@
 """
 
 import pytest
+from faker import Factory
+
+
+fake = Factory.create()
 
 
 class CollOpeHelper:
@@ -35,8 +39,10 @@ class CollOpeHelper:
 
 
 @pytest.mark.incremental
-def test_increse_collection_basic(rb, icoll):
+def test_collection_basic(rb, icoll, sc_coll, uc_coll):
     assert str(icoll) == '<IncreaseCollection - foo> . inc'
+    assert str(sc_coll) == '<SortedCountCollection - foo>'
+    assert str(uc_coll) == '<UniqueCountCollection - foo>'
 
 
 @pytest.mark.incremental
@@ -186,3 +192,168 @@ def test_increse_collection_batch_opes(rb, icoll, icoll2):
         _md_len, _cache_len = rb.get_collection_length(icoll, klass="IncreaseCollection")
         assert _md_len == len(tslist)
         assert _cache_len == len(tslist) * (ope_times - i)
+
+
+@pytest.mark.incremental
+def test_uniq_count_collection_batch_opes(rb, uc_coll):
+    items_num = 30
+    ope_times = 8
+    ope_times_range = ope_times + 1
+    half_ope_times_range = (ope_times // 2) + 1
+    not_exist_start, not_exist_end = 20000000, 30000000
+    start, end = 100, 300
+    tslist = [start, 200, end]
+    v = set()
+
+    def _fetch_data(tagging='__all__', d=True, e=True, expired=None):
+        rv = list(uc_coll.fetch(tagging, d, e, expired))
+        num = len(rv)
+        items = [item for _, val in rv
+                          for item in val]
+        return num, items
+
+    for i in range(1, ope_times_range):
+        tagging = 'test{}'.format(i)
+        value = {fake.uuid4() for i in range(items_num)}
+        v |= value
+        for ts in tslist:
+            # print(ts, tagging, len(value))
+            uc_coll.store(ts, tagging, value)
+
+        # ---------------- check Query ----------------
+        rv = list(uc_coll.query(start, end, tagging))
+        assert len(rv) == len(tslist)
+        for res in rv:
+            assert len(res[1]) == items_num
+            assert res[1] == value
+
+        assert uc_coll.query(not_exist_start, not_exist_end, tagging) is None
+
+        # ---------------- check Fetch ----------------
+        rv_num, rv = _fetch_data(d=False)
+        assert rv_num == i * len(tslist)
+        assert len(rv) == items_num * i * len(tslist)
+        assert set(rv) == v
+
+    # ---------------- check for not exist datas ----------------
+    rv_num, rv = _fetch_data(expired=50)
+    assert rv_num == 0 and rv == []
+
+    rv_num, rv = _fetch_data(d=False)
+    assert rv_num == ope_times * len(tslist)
+    assert len(rv) == items_num * ope_times * len(tslist)
+    assert set(rv) == v
+
+    # fetch one time tagging and deleting fetch again
+    rv_num, rv = _fetch_data(tagging=tagging, d=False)
+    assert rv_num == len(tslist)
+    assert len(rv) == items_num * len(tslist)
+    rv_num, rv = _fetch_data(tagging=tagging)
+    assert rv_num == len(tslist)
+    assert len(rv) == items_num * len(tslist)
+
+    # __all__ tagging should be decrease by 1
+    rv_num, rv = _fetch_data(d=False)
+    assert rv_num == ope_times * len(tslist)
+    assert len(rv) == items_num * (ope_times - 1) * len(tslist)
+
+    rv_num, rv = _fetch_data()
+    assert rv_num == ope_times * len(tslist)
+    assert len(rv) == items_num * (ope_times - 1) * len(tslist)
+
+    rv_num, rv = _fetch_data(d=False)
+    assert rv_num == ope_times * len(tslist)
+    assert len(rv) == 0
+
+
+@pytest.mark.incremental
+def test_sorted_count_collection_batch_opes(rb, sc_coll):
+    items_num = 30
+    ope_times = 8
+    ope_times_range = ope_times + 1
+    half_ope_times_range = (ope_times // 2) + 1
+    not_exist_start, not_exist_end = 20000000, 30000000
+    start, end = 100, 300
+    tslist = [start, 200, end]
+    v = {}
+
+    def _fetch_data(tagging='__all__', d=True, e=True, expired=None, topN=None):
+        rv = list(sc_coll.fetch(tagging, d, e, expired, topN))
+        num = len(rv)
+        items = {member: score for _, val in rv
+                          for member, score in val}
+        return num, items
+
+    for i in range(1, ope_times_range):
+        tagging = 'test{}'.format(i)
+        for ts in tslist:
+            value = {fake.uuid4(): 1 for i in range(items_num)}
+            v.update(value)
+            sc_coll.store(ts, tagging, value)
+
+        # ---------------- check Query ----------------
+        rv = list(sc_coll.query(start, end, tagging))
+        assert len(rv) == len(tslist)
+        for res in rv:
+            assert len(res[1]) == items_num
+        # only check the value of last adding timestamp
+        assert dict(res[1]) == value
+
+        rv = list(sc_coll.query(start, end, tagging, topN=10))
+        assert len(rv) == len(tslist)
+        for res in rv:
+            assert len(res[1]) == 10
+
+        assert sc_coll.query(not_exist_start, not_exist_end, tagging) is None
+
+        # ---------------- check Fetch ----------------
+        rv_num, rv = _fetch_data(d=False)
+        assert rv_num == i * len(tslist)
+        assert len(rv) == items_num * i * len(tslist)
+        assert rv == v
+
+        rv_num, rv = _fetch_data(d=False, topN=10)
+        assert rv_num == i * len(tslist)
+        assert len(rv) == 10 * i * len(tslist)
+
+    # ---------------- check for not exist datas ----------------
+    rv_num, rv = _fetch_data(expired=50)
+    assert rv_num == 0 and rv == {}
+
+    rv_num, rv = _fetch_data(d=False)
+    print(rv)
+    print(rv_num)
+    assert rv_num == ope_times * len(tslist)
+    assert len(rv) == items_num * ope_times * len(tslist)
+    assert rv == v
+
+    rv_num, rv = _fetch_data(d=False, topN=10)
+    assert rv_num == ope_times * len(tslist)
+    assert len(rv) == 10 * ope_times * len(tslist)
+
+    # fetch one time tagging and deleting fetch again
+    rv_num, rv = _fetch_data(tagging=tagging, d=False)
+    assert rv_num == len(tslist)
+    assert len(rv) == items_num * len(tslist)
+    rv_num, rv = _fetch_data(tagging=tagging, d=False, topN=10)
+    assert rv_num == len(tslist)
+    assert len(rv) == 10 * len(tslist)
+    rv_num, rv = _fetch_data(tagging=tagging)
+    assert rv_num == len(tslist)
+    assert len(rv) == items_num * len(tslist)
+    rv_num, rv = _fetch_data(tagging=tagging)
+    assert rv_num == len(tslist)
+    assert len(rv) == 0
+
+    # __all__ tagging should be decrease by 1
+    rv_num, rv = _fetch_data(d=False)
+    assert rv_num == ope_times * len(tslist)
+    assert len(rv) == items_num * (ope_times - 1) * len(tslist)
+
+    rv_num, rv = _fetch_data()
+    assert rv_num == ope_times * len(tslist)
+    assert len(rv) == items_num * (ope_times - 1) * len(tslist)
+
+    rv_num, rv = _fetch_data(d=False)
+    assert rv_num == ope_times * len(tslist)
+    assert len(rv) == 0

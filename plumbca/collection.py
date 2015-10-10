@@ -239,11 +239,12 @@ class SortedCountCollection(Collection):
         expire_items = [item for item in mds
                             if int(item[0][tagging][0]) < sentinel]
         tslist = [int(item[1]) for item in expire_items]
+        rv = self.bk.sorted_count_coll_cache_get(self, tagging, tslist, topN)
 
         if d and rv:
             self.bk.sorted_count_coll_cache_del(self, tagging, tslist)
 
-        return zip(tslist, self.bk.sorted_count_coll_cache_get(self, tagging, tslist, topN))
+        return zip(tslist, rv)
 
 
 class UniqueCountCollection(Collection):
@@ -293,8 +294,9 @@ class UniqueCountCollection(Collection):
         expire_items = [item for item in mds
                             if int(item[0][tagging][0]) < sentinel]
         tslist = [int(item[1]) for item in expire_items]
+        rv = self.bk.uniq_count_coll_cache_get(self, tagging, tslist)
 
         if d and rv:
             self.bk.uniq_count_coll_cache_del(self, tagging, tslist)
 
-        return zip(tslist, self.bk.uniq_count_coll_cache_get(self, tagging, tslist))
+        return zip(tslist, rv)

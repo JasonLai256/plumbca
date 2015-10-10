@@ -12,7 +12,7 @@ import pytest
 import random
 import logging
 
-from plumbca.collection import IncreaseCollection
+from plumbca.collection import IncreaseCollection, UniqueCountCollection, SortedCountCollection
 from plumbca.config import DefaultConf
 from plumbca.cache import CacheCtl
 import plumbca.log
@@ -49,6 +49,16 @@ def icoll():
 @pytest.fixture
 def icoll2():
     return IncreaseCollection('bar', 'max')
+
+
+@pytest.fixture
+def uc_coll():
+    return UniqueCountCollection('foo')
+
+
+@pytest.fixture
+def sc_coll():
+    return SortedCountCollection('foo')
 
 
 @pytest.fixture
