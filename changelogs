@@ -1,0 +1,4 @@
+0.3
+
+- feature: refactor the datastruct of metadata and the relative handling logic.
+- feature: adding new SortedCountCollection and UniqueCountCollection class.
