@@ -55,7 +55,11 @@ class Collection(object):
         if not mds:
             return
 
-        return sorted(int(item[1]) for item in mds)
+        # (ts, info) 2-tuple pair of list
+        rv = [(int(item[1]), item[0]) for item in mds]
+        rv = sorted(rv, key=lambda x: x[0])
+        # return (ts-list, parameter-list) 2-tuple
+        return [ts for ts, _ in rv], (info[1:] for _, info in rv)
 
     def query(self, stime, etime, tagging):
         """Provide query API with time ranges parameter.
@@ -110,12 +114,13 @@ class IncreaseCollection(Collection):
         return '{}:{}'.format(str(ts), tagging)
 
     def query(self, stime, etime, tagging):
-        tslist = self._figure_range_timestamps(stime, etime, tagging)
-        if not tslist:
+        rv = self._figure_range_timestamps(stime, etime, tagging)
+        if not rv:
             return
 
+        tslist, parameters = rv
         keys = [self.gen_key_name(ts, tagging) for ts in tslist]
-        return zip(keys, self.bk.inc_coll_caches_get(self, *keys))
+        return zip(keys, self.bk.inc_coll_caches_get(self, *keys), parameters)
 
     def store(self, ts, tagging, value, abselute_expire=None, expire_from_now=False):
         if not isinstance(value, dict):
@@ -158,25 +163,31 @@ class IncreaseCollection(Collection):
                         the specific expire time.
         """
         sentinel = self._figure_expired_sentinel(d, e, expired)
+        # figure whole metadatas for all taggings
+        mds = self.bk.query_collection_metadata(self, '__all__', 0, sentinel)
+        if not mds:
+            return
 
+        mds = [(info, ts) for ts, info in mds.items()]
+        mds = sorted(mds, key=lambda x: x[1])
         if tagging == '__all__':
             for t in self.taggings:
-                yield from self._fetch_expired(sentinel, t, d)
+                yield from self._fetch_expired(mds, sentinel, t, d)
         else:
-            yield from self._fetch_expired(sentinel, tagging, d)
+            yield from self._fetch_expired(mds, sentinel, tagging, d)
 
-    def _fetch_expired(self, sentinel, tagging, d):
-        mds = self.bk.query_collection_metadata(self, tagging, 0, sentinel,
-                                                ret_whold=True)
-        if not mds:
-            return []
+    def _fetch_expired(self, mds, sentinel, tagging, d):
+        # figure the match tagging metadatas
+        tagging_mds = [item for item in mds if tagging in item[0]]
 
         # get the expire_time and ts values.
         # Must be konwn that show below:
         #     item[0][tagging][0] => the specified tagging expire_time
+        #     item[0][tagging][1:] => the other tagging parameters
         #     item[1] => timestamp of current handling metadata
-        expire_items = [item for item in mds
+        expire_items = [item for item in tagging_mds
                             if int(item[0][tagging][0]) < sentinel]
+        parameters = [item[0][tagging][1:] for item in expire_items]
         tslist = [int(item[1]) for item in expire_items]
         keys = [self.gen_key_name(t, tagging) for t in tslist]
         rv = self.bk.inc_coll_caches_get(self, *keys)
@@ -186,7 +197,7 @@ class IncreaseCollection(Collection):
             self.bk.del_collection_metadata_by_items(self, tagging, expire_items)
             self.bk.inc_coll_caches_del(self, *keys)
 
-        return zip(keys, rv)
+        return zip(keys, rv, parameters)
 
 
 class SortedCountCollection(Collection):
@@ -205,11 +216,14 @@ class SortedCountCollection(Collection):
         return self.__repl__()
 
     def query(self, stime, etime, tagging, topN=None):
-        tslist = self._figure_range_timestamps(stime, etime, tagging)
-        if not tslist:
+        rv = self._figure_range_timestamps(stime, etime, tagging)
+        if not rv:
             return
 
-        return zip(tslist, self.bk.sorted_count_coll_cache_get(self, tagging, tslist, topN))
+        tslist, parameters = rv
+        return zip(tslist,
+                   self.bk.sorted_count_coll_cache_get(self, tagging, tslist, topN),
+                   parameters)
 
     def store(self, ts, tagging, value, abselute_expire=None, expire_from_now=False):
         if not isinstance(value, dict):
@@ -263,11 +277,14 @@ class UniqueCountCollection(Collection):
         return self.__repl__()
 
     def query(self, stime, etime, tagging):
-        tslist = self._figure_range_timestamps(stime, etime, tagging)
-        if not tslist:
+        rv = self._figure_range_timestamps(stime, etime, tagging)
+        if not rv:
             return
 
-        return zip(tslist, self.bk.uniq_count_coll_cache_get(self, tagging, tslist))
+        tslist, parameters = rv
+        return zip(tslist,
+                   self.bk.uniq_count_coll_cache_get(self, tagging, tslist),
+                   parameters)
 
     def store(self, ts, tagging, value, abselute_expire=None, expire_from_now=False):
         self.taggings.add(tagging)
