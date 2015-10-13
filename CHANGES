@@ -1,13 +1,13 @@
 Changes with plumbca 0.4 (Continuous Developing)
 
-  - Change: optimize the fetch method of Collection class in collection module
-    that extract the metadata query operation from _fetch_expired method to the
-    fetch method, so that decrease the calls of the metadata query.
-  - Change: adding parameters option to the return for the query and fetch method
-    of Collection class in collection module.
+  *) Change: optimize the fetch method of Collection class in collection module
+     that extract the metadata query operation from _fetch_expired method to the
+     fetch method, so that decrease the calls of the metadata query.
+  *) Change: adding parameters option to the return for the query and fetch method
+     of Collection class in collection module.
 
 
 (11 Oct 2015) Changes with plumbca 0.3
 
-  - Feature: refactor the datastruct of metadata and the relative handling logic.
-  - Feature: adding new SortedCountCollection and UniqueCountCollection class.
+  *) Feature: refactor the datastruct of metadata and the relative handling logic.
+  *) Feature: adding new SortedCountCollection and UniqueCountCollection class.
