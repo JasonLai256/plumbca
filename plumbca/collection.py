@@ -61,6 +61,34 @@ class Collection(object):
         # return (ts-list, parameter-list) 2-tuple
         return [ts for ts, _ in rv], (info[1:] for _, info in rv)
 
+    def _figure_fetch_exipired_items(self, mds, sentinel, tagging):
+        """fetch the expired items of specific tagging.
+
+        To get the expire_time and ts values, must be konwn that show below:
+            mds.keys() => timestamps of current handling metadata
+            mds[ts] => the specified tagging info
+            mds[ts][tagging][0] => the specified tagging expire_time
+            mds[ts][tagging][1] => the other tagging parameters
+
+            item[0][tagging][0] => the specified tagging expire_time
+            item[0][tagging][1:] => the other tagging parameters
+            item[1] => timestamp of current handling metadata
+
+        :param mds: the metadata items query from metadata, structure should be
+                    equal to the format of the metadata query that specified __all__.
+        """
+        # filter the mds of the specifi tagging
+        tagging_mds = [(info, ts) for ts, info in mds.items() if tagging in info]
+
+        # figure and sort the expired items
+        expire_items = [item for item in tagging_mds
+                            if int(item[0][tagging][0]) < sentinel]
+        expire_items = sorted(expire_items, key=lambda x: x[1])
+        parameters = [item[0][tagging][1:] for item in expire_items]
+        tslist = [int(item[1]) for item in expire_items]
+
+        return expire_items, tslist, parameters
+
     def query(self, stime, etime, tagging):
         """Provide query API with time ranges parameter.
         """
@@ -168,8 +196,6 @@ class IncreaseCollection(Collection):
         if not mds:
             return
 
-        mds = [(info, ts) for ts, info in mds.items()]
-        mds = sorted(mds, key=lambda x: x[1])
         if tagging == '__all__':
             for t in self.taggings:
                 yield from self._fetch_expired(mds, sentinel, t, d)
@@ -177,18 +203,22 @@ class IncreaseCollection(Collection):
             yield from self._fetch_expired(mds, sentinel, tagging, d)
 
     def _fetch_expired(self, mds, sentinel, tagging, d):
-        # figure the match tagging metadatas
-        tagging_mds = [item for item in mds if tagging in item[0]]
+        """fetch the expired items of specific tagging.
 
-        # get the expire_time and ts values.
-        # Must be konwn that show below:
-        #     item[0][tagging][0] => the specified tagging expire_time
-        #     item[0][tagging][1:] => the other tagging parameters
-        #     item[1] => timestamp of current handling metadata
-        expire_items = [item for item in tagging_mds
-                            if int(item[0][tagging][0]) < sentinel]
-        parameters = [item[0][tagging][1:] for item in expire_items]
-        tslist = [int(item[1]) for item in expire_items]
+        To get the expire_time and ts values, must be konwn that show below:
+            mds.keys() => timestamps of current handling metadata
+            mds[ts] => the specified tagging info
+            mds[ts][tagging][0] => the specified tagging expire_time
+            mds[ts][tagging][1] => the other tagging parameters
+
+            item[0][tagging][0] => the specified tagging expire_time
+            item[0][tagging][1:] => the other tagging parameters
+            item[1] => timestamp of current handling metadata
+        """
+        result = self._figure_fetch_exipired_items(mds, sentinel, tagging)
+        expire_items, tslist, parameters = result
+
+        # construct the keys and fetch the values
         keys = [self.gen_key_name(t, tagging) for t in tslist]
         rv = self.bk.inc_coll_caches_get(self, *keys)
 
@@ -237,28 +267,27 @@ class SortedCountCollection(Collection):
 
     def fetch(self, tagging='__all__', d=True, e=True, expired=None, topN=None):
         sentinel = self._figure_expired_sentinel(d, e, expired)
+        # figure whole metadatas for all taggings
+        mds = self.bk.query_collection_metadata(self, '__all__', 0, sentinel)
+        if not mds:
+            return
 
         if tagging == '__all__':
             for t in self.taggings:
-                yield from self._fetch_expired(sentinel, t, d, topN)
+                yield from self._fetch_expired(mds, sentinel, t, d, topN)
         else:
-            yield from self._fetch_expired(sentinel, tagging, d, topN)
+            yield from self._fetch_expired(mds, sentinel, tagging, d, topN)
 
-    def _fetch_expired(self, sentinel, tagging, d, topN):
-        mds = self.bk.query_collection_metadata(self, tagging, 0, sentinel,
-                                                ret_whold=True)
-        if not mds:
-            return []
-
-        expire_items = [item for item in mds
-                            if int(item[0][tagging][0]) < sentinel]
-        tslist = [int(item[1]) for item in expire_items]
+    def _fetch_expired(self, mds, sentinel, tagging, d, topN):
+        result = self._figure_fetch_exipired_items(mds, sentinel, tagging)
+        expire_items, tslist, parameters = result
         rv = self.bk.sorted_count_coll_cache_get(self, tagging, tslist, topN)
 
         if d and rv:
+            self.bk.del_collection_metadata_by_items(self, tagging, expire_items)
             self.bk.sorted_count_coll_cache_del(self, tagging, tslist)
 
-        return zip(tslist, rv)
+        return zip(tslist, rv, parameters)
 
 
 class UniqueCountCollection(Collection):
@@ -295,25 +324,24 @@ class UniqueCountCollection(Collection):
 
     def fetch(self, tagging='__all__', d=True, e=True, expired=None):
         sentinel = self._figure_expired_sentinel(d, e, expired)
+        # figure whole metadatas for all taggings
+        mds = self.bk.query_collection_metadata(self, '__all__', 0, sentinel)
+        if not mds:
+            return
 
         if tagging == '__all__':
             for t in self.taggings:
-                yield from self._fetch_expired(sentinel, t, d)
+                yield from self._fetch_expired(mds, sentinel, t, d)
         else:
-            yield from self._fetch_expired(sentinel, tagging, d)
+            yield from self._fetch_expired(mds, sentinel, tagging, d)
 
-    def _fetch_expired(self, sentinel, tagging, d):
-        mds = self.bk.query_collection_metadata(self, tagging, 0, sentinel,
-                                                ret_whold=True)
-        if not mds:
-            return []
-
-        expire_items = [item for item in mds
-                            if int(item[0][tagging][0]) < sentinel]
-        tslist = [int(item[1]) for item in expire_items]
+    def _fetch_expired(self, mds, sentinel, tagging, d):
+        result = self._figure_fetch_exipired_items(mds, sentinel, tagging)
+        expire_items, tslist, parameters = result
         rv = self.bk.uniq_count_coll_cache_get(self, tagging, tslist)
 
         if d and rv:
+            self.bk.del_collection_metadata_by_items(self, tagging, expire_items)
             self.bk.uniq_count_coll_cache_del(self, tagging, tslist)
 
-        return zip(tslist, rv)
+        return zip(tslist, rv, parameters)

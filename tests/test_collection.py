@@ -80,7 +80,7 @@ def test_increse_collection_query(rb, icoll, tag_list):
     for i, t in enumerate(tag_list, 1):
         tslist, tagging = CollOpeHelper.icoll_insert_data(icoll, t)
         res = list(icoll.query(10, 1000, tagging))
-        print('results -', res)
+        # print('results -', res)
         assert len(res) == 5
         assert res[0][0].split(':')[0] == '108'
         assert res[0][1] == {'bar': 1}
@@ -88,7 +88,7 @@ def test_increse_collection_query(rb, icoll, tag_list):
         assert res[-1][1] == {'bar': 1}
 
         res = list(icoll.query(100, 150, tagging))
-        print('results -', res)
+        # print('results -', res)
         assert len(res) == 3
         assert res[0][0].split(':')[0] == '108'
         assert res[0][1] == {'bar': 1}
@@ -98,7 +98,7 @@ def test_increse_collection_query(rb, icoll, tag_list):
         assert res[2][1] == {'bar': 1}
 
         res = list(icoll.query(108, 109, tagging))
-        print('results -', res)
+        # print('results -', res)
         assert len(res) == 1
         assert res[0][0].split(':')[0] == '108'
         assert res[0][1] == {'bar': 1}
@@ -208,7 +208,7 @@ def test_uniq_count_collection_batch_opes(rb, uc_coll):
     def _fetch_data(tagging='__all__', d=True, e=True, expired=None):
         rv = list(uc_coll.fetch(tagging, d, e, expired))
         num = len(rv)
-        items = [item for _, val in rv
+        items = [item for _, val, _ in rv
                           for item in val]
         return num, items
 
@@ -251,18 +251,21 @@ def test_uniq_count_collection_batch_opes(rb, uc_coll):
     rv_num, rv = _fetch_data(tagging=tagging)
     assert rv_num == len(tslist)
     assert len(rv) == items_num * len(tslist)
+    rv_num, rv = _fetch_data(tagging=tagging)
+    assert rv_num == 0
+    assert len(rv) == 0
 
     # __all__ tagging should be decrease by 1
     rv_num, rv = _fetch_data(d=False)
-    assert rv_num == ope_times * len(tslist)
+    assert rv_num == (ope_times - 1) * len(tslist)
     assert len(rv) == items_num * (ope_times - 1) * len(tslist)
 
     rv_num, rv = _fetch_data()
-    assert rv_num == ope_times * len(tslist)
+    assert rv_num == (ope_times - 1) * len(tslist)
     assert len(rv) == items_num * (ope_times - 1) * len(tslist)
 
     rv_num, rv = _fetch_data(d=False)
-    assert rv_num == ope_times * len(tslist)
+    assert rv_num == 0
     assert len(rv) == 0
 
 
@@ -271,7 +274,6 @@ def test_sorted_count_collection_batch_opes(rb, sc_coll):
     items_num = 30
     ope_times = 8
     ope_times_range = ope_times + 1
-    half_ope_times_range = (ope_times // 2) + 1
     not_exist_start, not_exist_end = 20000000, 30000000
     start, end = 100, 300
     tslist = [start, 200, end]
@@ -280,7 +282,7 @@ def test_sorted_count_collection_batch_opes(rb, sc_coll):
     def _fetch_data(tagging='__all__', d=True, e=True, expired=None, topN=None):
         rv = list(sc_coll.fetch(tagging, d, e, expired, topN))
         num = len(rv)
-        items = {member: score for _, val in rv
+        items = {member: score for _, val, _ in rv
                           for member, score in val}
         return num, items
 
@@ -321,8 +323,6 @@ def test_sorted_count_collection_batch_opes(rb, sc_coll):
     assert rv_num == 0 and rv == {}
 
     rv_num, rv = _fetch_data(d=False)
-    print(rv)
-    print(rv_num)
     assert rv_num == ope_times * len(tslist)
     assert len(rv) == items_num * ope_times * len(tslist)
     assert rv == v
@@ -342,18 +342,18 @@ def test_sorted_count_collection_batch_opes(rb, sc_coll):
     assert rv_num == len(tslist)
     assert len(rv) == items_num * len(tslist)
     rv_num, rv = _fetch_data(tagging=tagging)
-    assert rv_num == len(tslist)
+    assert rv_num == 0
     assert len(rv) == 0
 
     # __all__ tagging should be decrease by 1
     rv_num, rv = _fetch_data(d=False)
-    assert rv_num == ope_times * len(tslist)
+    assert rv_num == (ope_times - 1) * len(tslist)
     assert len(rv) == items_num * (ope_times - 1) * len(tslist)
 
     rv_num, rv = _fetch_data()
-    assert rv_num == ope_times * len(tslist)
+    assert rv_num == (ope_times - 1) * len(tslist)
     assert len(rv) == items_num * (ope_times - 1) * len(tslist)
 
     rv_num, rv = _fetch_data(d=False)
-    assert rv_num == ope_times * len(tslist)
+    assert rv_num == 0
     assert len(rv) == 0
