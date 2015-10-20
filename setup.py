@@ -17,7 +17,7 @@ setup(
     license='BSD',
     author='Jason Lai',
     author_email='jasonlai256@gmail.com',
-    description='.',
+    description='PlumbCa is a lightweigth k/v database for caching and computing the frequently accessed data base on Redis.',
     classifiers=[
         'Development Status :: 4 - Beta',
         'Intended Audience :: Developers',

@@ -91,13 +91,43 @@ class Collection(object):
 
     def query(self, stime, etime, tagging):
         """Provide query API with time ranges parameter.
+
+        Return data format::
+        {
+            target: {
+                ts1: info1, ts2: info2, ..., tsN: infoN
+            }
+        }
         """
         raise NotImplementedError
 
     def store(self, ts, tagging, value):
         raise NotImplementedError
 
-    def fetch(self):
+    def fetch(self, tagging='__all__', d=True, e=True, expired=None):
+        """Fetch the expired data from the store, there will delete the returned
+        items by default.
+
+        :param tagging: specific tagging value for the collection
+        :param d: whether delete the returned items.
+        :param e: only fetch expired data if True.
+        :param expired: if `e` specify to True and expired can to specify
+                        the specific expire time.
+
+        Return data format::
+        {
+            target1: {
+                ts1: info1, ts2: info2, ..., tsN: infoN
+            },
+            target2: {
+                ts1: info1, ts2: info2, ..., tsN: infoN
+            },
+            ...
+            targetN: {
+                ts1: info1, ts2: info2, ..., tsN: infoN
+            },
+        }
+        """
         raise NotImplementedError
 
     def dump(self, fpath):
@@ -144,7 +174,7 @@ class IncreaseCollection(Collection):
     def query(self, stime, etime, tagging):
         rv = self._figure_range_timestamps(stime, etime, tagging)
         if not rv:
-            return
+            return []
 
         tslist, parameters = rv
         keys = [self.gen_key_name(ts, tagging) for ts in tslist]
@@ -181,20 +211,11 @@ class IncreaseCollection(Collection):
         self.bk.inc_coll_cache_set(self, keyname, base)
 
     def fetch(self, tagging='__all__', d=True, e=True, expired=None):
-        """Fetch the expired data from the store, there will delete the returned
-        items by default.
-
-        :param tagging: specific tagging value for the collection
-        :param d: whether delete the returned items.
-        :param e: only fetch expired data if True.
-        :param expired: if `e` specify to True and expired can to specify
-                        the specific expire time.
-        """
         sentinel = self._figure_expired_sentinel(d, e, expired)
         # figure whole metadatas for all taggings
         mds = self.bk.query_collection_metadata(self, '__all__', 0, sentinel)
         if not mds:
-            return
+            return []
 
         if tagging == '__all__':
             for t in self.taggings:
@@ -203,18 +224,6 @@ class IncreaseCollection(Collection):
             yield from self._fetch_expired(mds, sentinel, tagging, d)
 
     def _fetch_expired(self, mds, sentinel, tagging, d):
-        """fetch the expired items of specific tagging.
-
-        To get the expire_time and ts values, must be konwn that show below:
-            mds.keys() => timestamps of current handling metadata
-            mds[ts] => the specified tagging info
-            mds[ts][tagging][0] => the specified tagging expire_time
-            mds[ts][tagging][1] => the other tagging parameters
-
-            item[0][tagging][0] => the specified tagging expire_time
-            item[0][tagging][1:] => the other tagging parameters
-            item[1] => timestamp of current handling metadata
-        """
         result = self._figure_fetch_exipired_items(mds, sentinel, tagging)
         expire_items, tslist, parameters = result
 
@@ -248,7 +257,7 @@ class SortedCountCollection(Collection):
     def query(self, stime, etime, tagging, topN=None):
         rv = self._figure_range_timestamps(stime, etime, tagging)
         if not rv:
-            return
+            return []
 
         tslist, parameters = rv
         return zip(tslist,
@@ -270,7 +279,7 @@ class SortedCountCollection(Collection):
         # figure whole metadatas for all taggings
         mds = self.bk.query_collection_metadata(self, '__all__', 0, sentinel)
         if not mds:
-            return
+            return []
 
         if tagging == '__all__':
             for t in self.taggings:
@@ -308,7 +317,7 @@ class UniqueCountCollection(Collection):
     def query(self, stime, etime, tagging):
         rv = self._figure_range_timestamps(stime, etime, tagging)
         if not rv:
-            return
+            return []
 
         tslist, parameters = rv
         return zip(tslist,
@@ -327,7 +336,7 @@ class UniqueCountCollection(Collection):
         # figure whole metadatas for all taggings
         mds = self.bk.query_collection_metadata(self, '__all__', 0, sentinel)
         if not mds:
-            return
+            return []
 
         if tagging == '__all__':
             for t in self.taggings:

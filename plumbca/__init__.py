@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-version = (0, 3)
+version = (0, 3, 1)
 
 __author__ = "Jason Lai"
 __license__ = "BSD"
