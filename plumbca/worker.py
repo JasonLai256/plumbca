@@ -149,7 +149,8 @@ class Worker(Thread):
 
     def _gen_response(self, request, cmd_status, cmd_value):
         if cmd_status == FAILURE_STATUS:
-            header = ResponseHeader(status=cmd_status, err_code=cmd_value[0], err_msg=cmd_value[1])
+            header = ResponseHeader(status=cmd_status, err_code=cmd_value[0],
+                                    err_msg=cmd_value[1])
             content = ResponseContent(datas=None)
         else:
             if 'compression' in request.meta:

@@ -103,10 +103,10 @@ def test_increse_collection_query(rb, icoll, tag_list):
         assert res[0][0].split(':')[0] == '108'
         assert res[0][1] == {'bar': 1}
 
-        assert icoll.query(107, 107, tagging) is None
-        assert icoll.query(150, 100, tagging) is None
-        assert icoll.query(15, 100, tagging) is None
-        assert icoll.query(1500, 2000, tagging) is None
+        assert icoll.query(107, 107, tagging) == []
+        assert icoll.query(150, 100, tagging) == []
+        assert icoll.query(15, 100, tagging) == []
+        assert icoll.query(1500, 2000, tagging) == []
 
 
 @pytest.mark.incremental
@@ -227,7 +227,7 @@ def test_uniq_count_collection_batch_opes(rb, uc_coll):
             assert len(res[1]) == items_num
             assert res[1] == value
 
-        assert uc_coll.query(not_exist_start, not_exist_end, tagging) is None
+        assert uc_coll.query(not_exist_start, not_exist_end, tagging) == []
 
         # ---------------- check Fetch ----------------
         rv_num, rv = _fetch_data(d=False)
@@ -306,7 +306,7 @@ def test_sorted_count_collection_batch_opes(rb, sc_coll):
         for res in rv:
             assert len(res[1]) == 10
 
-        assert sc_coll.query(not_exist_start, not_exist_end, tagging) is None
+        assert sc_coll.query(not_exist_start, not_exist_end, tagging) == []
 
         # ---------------- check Fetch ----------------
         rv_num, rv = _fetch_data(d=False)
