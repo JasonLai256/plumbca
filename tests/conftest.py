@@ -7,16 +7,23 @@
     :license: BSD, see LICENSE for more details.
 """
 
-import pytest
-
 import random
 import logging
+import asyncio
+from unittest import mock
 
-from plumbca.collection import IncreaseCollection, UniqueCountCollection, SortedCountCollection
-from plumbca.config import DefaultConf
-from plumbca.cache import CacheCtl
+import pytest
 import plumbca.log
+from plumbca.collection import IncreaseCollection, UniqueCountCollection, SortedCountCollection
+from plumbca.config import DefaultConf, RedisConf as rdconf
+from plumbca.cache import CacheCtl
 from plumbca.backend import BackendFactory
+from redis import StrictRedis
+
+from utils import CoroWraps
+
+
+logging.basicConfig(level=logging.DEBUG)
 
 
 def pytest_runtest_makereport(item, call):
@@ -138,9 +145,56 @@ def rb(request):
 
 
 @pytest.fixture(scope='function')
+def arb(request):
+    rbackend = BackendFactory('aioredis')
+    aclog = logging.getLogger('activity')
+
+    def fin():
+        rdb = StrictRedis(host=rdconf['host'], port=rdconf['port'],
+                          db=rdconf['db'])
+        keys = rdb.keys()
+        aclog.warning('[RBACKEND FINISH] %s - %s', keys, len(keys))
+        aclog.warning('[RBACKEND FINISH] module %s, function: %s',
+                      request.module, request.function)
+        if keys:
+            rv = rdb.delete(*keys)
+            aclog.warning('[RBACKEND CLEAN UP] deleted %s items.', rv)
+    request.addfinalizer(fin)
+
+    return rbackend
+
+
+@pytest.fixture(scope='function')
 def cachectl(request):
     def fin():
         CacheCtl.collmap = {}
     request.addfinalizer(fin)
 
     return CacheCtl
+
+
+@pytest.fixture(scope='function')
+def loop(request):
+    # We want explicit loops
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+
+    def fin():
+        loop.stop()
+        loop.close()
+
+    return loop
+
+
+@pytest.fixture
+def reader():
+    m = mock.MagicMock()
+    return m
+
+
+@pytest.fixture
+def writer():
+    m = mock.MagicMock()
+    m.drain = CoroWraps()
+    m.get_extra_info.return_value = 'test'
+    return m

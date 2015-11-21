@@ -19,8 +19,17 @@ packb = partial(packb)
 unpackb = partial(unpackb, encoding='utf-8')
 
 
+def decode(obj, encoding='utf-8'):
+    if isinstance(obj, bytes):
+        return obj.decode(encoding)
+    elif isinstance(obj, list):
+        return [o.decode(encoding) if isinstance(o, bytes) else o
+                for o in obj]
+    return obj
+
+
 def frame2str(frame):
-    return frame.bytes.decode('utf8').lower()
+    return frame.decode('utf8').lower()
 
 
 def find_eq(a, x, ret_index=False):
