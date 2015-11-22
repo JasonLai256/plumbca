@@ -589,6 +589,120 @@ class AioRedisBackend(RedisBackend):
 
         return rv
 
+    async def inc_coll_cache_set(self, coll, field, value):
+        key = self.inc_coll_cache_fmt.format(name=coll.name)
+        await self.rdb.hset(key, field, packb(value))
+
+    async def inc_coll_caches_get(self, coll, *fields):
+        """
+        :ret: return [] if no data exists. Normal structure is:
+                [value1, value2, ..., valueN]
+        """
+        if not fields:
+            return []
+
+        key = self.inc_coll_cache_fmt.format(name=coll.name)
+        rv = await self.rdb.hmget(key, *fields)
+        # print('inc_coll_caches_get - ', rv)
+        # print('inc_coll_caches_get After - ', [unpackb(r) for r in rv if r])
+        return [unpackb(r) for r in rv if r]
+
+    async def inc_coll_caches_del(self, coll, *fields):
+        key = self.inc_coll_cache_fmt.format(name=coll.name)
+        return await self.rdb.hdel(key, *fields)
+
+    async def uniq_count_coll_cache_set(self, coll, ts, tagging, values):
+        """
+        :param values: should be a iterable object contain members
+        """
+        values = {packb(v) for v in values}
+        key_fmt = self.unique_count_coll_cache_fmt
+        key = key_fmt.format(name=coll.name, tagging=tagging, ts=ts)
+        return await self.rdb.sadd(key, *values)
+
+    async def uniq_count_coll_cache_get(self, coll, tagging, timestamps, count_only=False):
+        key_fmt = self.unique_count_coll_cache_fmt
+        rv = []
+        for ts in timestamps:
+            key = key_fmt.format(name=coll.name, tagging=tagging, ts=ts)
+            if count_only:
+                count = await self.rdb.scard(key)
+                rv.append(count)
+            else:
+                members = await self.rdb.smembers(key)
+                rv.append({unpackb(m) for m in members})
+        return rv
+
+    async def uniq_count_coll_cache_pop(self, coll, tagging, timestamps, number):
+        """
+        :note: Redis `SPOP key [count]` command, The count argument will be
+               available in a later version and is not available
+               in 2.6, 2.8, 3.0.
+               Now use SRANDMEMBER and SREM commands to mimic the effect of
+               SPOP count.
+        """
+        key_fmt = self.unique_count_coll_cache_fmt
+        rv = []
+        for ts in timestamps:
+            key = key_fmt.format(name=coll.name, tagging=tagging, ts=ts)
+            # :: srandmember + srem == spop(key, number)
+            members = await self.rdb.srandmember(key, number)
+            await self.rdb.srem(key, *members)
+            rv.append({unpackb(m) for m in members})
+        return rv
+
+    async def uniq_count_coll_cache_del(self, coll, tagging, timestamps):
+        keys = self._gen_count_keys(coll.name, tagging,
+                                    'unique_count', timestamps)
+        return await self.rdb.delete(*keys)
+
+    async def sorted_count_coll_cache_set(self, coll, ts, tagging, values):
+        """
+        :param values: should be a dict of <member: score> pair
+        """
+        key_fmt = self.sorted_count_coll_cache_fmt
+        key = key_fmt.format(name=coll.name, tagging=tagging, ts=ts)
+        add_val = []
+        for member, score in values.items():
+            add_val.append(score)
+            add_val.append(packb(member))
+        return await self.rdb.zadd(key, *add_val)
+
+    async def sorted_count_coll_cache_get(self, coll, tagging, timestamps, topN=None):
+        key_fmt = self.sorted_count_coll_cache_fmt
+        rv = []
+        for ts in timestamps:
+            key = key_fmt.format(name=coll.name, tagging=tagging, ts=ts)
+            if topN:
+                elements = await self.rdb.zrange(key, -topN, -1, withscores=True)
+            else:
+                elements = await self.rdb.zrange(key, 0, -1, withscores=True)
+            # there is `(member, score) pair`
+            elements = [(unpackb(elements[i]), elements[i+1])
+                        for i in range(0, len(elements), 2)]
+            rv.append(elements)
+        # import pprint
+        # pprint.pprint(rv)
+        return rv
+
+    async def sorted_count_coll_cache_del(self, coll, tagging, timestamps):
+        keys = self._gen_count_keys(coll.name, tagging,
+                                    'sorted_count', timestamps)
+        return await self.rdb.delete(*keys)
+
+    def _gen_count_keys(self, name, tagging, cachetype, timestamps):
+        if cachetype == 'unique_count':
+            key_fmt = self.unique_count_coll_cache_fmt
+        elif cachetype == 'sorted_count':
+            key_fmt = self.sorted_count_coll_cache_fmt
+
+        keys = []
+        for ts in timestamps:
+            k = key_fmt.format(name=name, tagging=tagging, ts=ts)
+            keys.append(k)
+
+        return keys
+
 
 _backends = {
     'redis': RedisBackend(),
