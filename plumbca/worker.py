@@ -81,7 +81,7 @@ class Worker(Thread):
         # Nothing todo
         return Response(datas='DUMP OK')
 
-    def store(self, collection, *args, **kwargs):
+    async def store(self, collection, *args, **kwargs):
         """
         Handles Store message command.
         Executes a Store operation over the specific collection.
@@ -95,10 +95,10 @@ class Worker(Thread):
         wrtlog.info('<WORKER> handling Store command - %s, %s ... %s ...',
                     collection, args[:2], len(args[2]))
         coll = CacheCtl.get_collection(collection)
-        coll.store(*args, **kwargs)
+        await coll.store(*args, **kwargs)
         return Response(datas='Store OK')
 
-    def query(self, collection, *args, **kwargs):
+    async def query(self, collection, *args, **kwargs):
         """
         Handles Query message command.
         Executes a Put operation over the plumbca backend.
@@ -111,11 +111,11 @@ class Worker(Thread):
         actlog.info('<WORKER> handling Query command - %s, %s ...',
                     collection, args)
         coll = CacheCtl.get_collection(collection)
-        rv = coll.query(*args, **kwargs)
+        rv = await coll.query(*args, **kwargs)
         rv = list(rv) if rv else []
         return Response(datas=rv)
 
-    def fetch(self, collection, *args, **kwargs):
+    async def fetch(self, collection, *args, **kwargs):
         """
         Handles Fetch message command
         Executes a Delete operation over the plumbca backend.
@@ -128,7 +128,7 @@ class Worker(Thread):
         actlog.info('<WORKER> handling Fetch command - %s, %s ...',
                     collection, args)
         coll = CacheCtl.get_collection(collection)
-        rv = coll.fetch(*args, **kwargs)
+        rv = await coll.fetch(*args, **kwargs)
         rv = list(rv) if rv else []
         return Response(datas=rv)
 
@@ -139,11 +139,11 @@ class Worker(Thread):
         rv = list(CacheCtl.collmap.keys())
         return Response(datas=rv)
 
-    def ensure_collection(self, name, coll_type='IncreaseCollection',
+    async def ensure_collection(self, name, coll_type='IncreaseCollection',
                           expired=3600):
         actlog.info('<WORKER> handling ENSURE_COLLECTION command - %s, %s, %s ...',
                     name, coll_type, expired)
-        CacheCtl.ensure_collection(name, coll_type, expired)
+        await CacheCtl.ensure_collection(name, coll_type, expired)
         assert name in CacheCtl.collmap
         return Response(datas='Ensure OK')
 

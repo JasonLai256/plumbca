@@ -28,7 +28,7 @@ defaults = {
         'activity_log': '/var/log/plumbca/plumbca.log',
         'errors_log': '/var/log/plumbca/plumbca_errors.log',
         'mark_version': '1.0',
-        'backend': 'redis',
+        'backend': 'aioredis',
     },
     'redis': {
         'host': '127.0.0.1',

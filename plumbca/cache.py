@@ -36,12 +36,12 @@ class CacheCtl(object):
 
         return self.collmap[name]
 
-    def ensure_collection(self, name, ctype, expire, **kwargs):
-        rv = self.bk.get_collection_index(name)
+    async def ensure_collection(self, name, ctype, expire, **kwargs):
+        rv = await self.bk.get_collection_index(name)
 
         if name not in self.collmap and not rv:
             self.collmap[name] = globals()[ctype](name, expire=expire, **kwargs)
-            self.bk.set_collection_index(name, self.collmap[name])
+            await self.bk.set_collection_index(name, self.collmap[name])
             actlog.info("Ensure collection - not exists in plumbca and redis, "
                         "create it, `%s`.", self.collmap[name])
 
@@ -54,7 +54,7 @@ class CacheCtl(object):
                         "create it, `%s`.", self.collmap[name])
 
         elif name in self.collmap and not rv:
-            self.bk.set_collection_index(name, self.collmap[name])
+            await self.bk.set_collection_index(name, self.collmap[name])
             actlog.info("Ensure collection - not exists in redis, "
                         "create it, `%s`.", self.collmap[name])
 
