@@ -9,6 +9,7 @@
     :license: BSD, see LICENSE for more details.
 """
 
+from itertools import chain
 from threading import Lock
 import time
 
@@ -47,11 +48,12 @@ class Collection(object):
             rv = self.end_ts
         return rv
 
-    def _figure_range_timestamps(self, stime, etime, tagging):
+    async def _figure_range_timestamps(self, stime, etime, tagging):
         if stime > etime:
             return
 
-        mds = self.bk.query_collection_metadata(self, tagging, stime, etime)
+        mds = await self.bk.query_collection_metadata(self, tagging,
+                                                      stime, etime)
         if not mds:
             return
 
@@ -87,7 +89,9 @@ class Collection(object):
         parameters = [item[0][tagging][1:] for item in expire_items]
         tslist = [int(item[1]) for item in expire_items]
 
-        return expire_items, tslist, parameters
+        # Notice! - `(member, score) pair`
+        # there is need to build the suitable construction of the expire_items
+        return list(chain(*expire_items)), tslist, parameters
 
     def query(self, stime, etime, tagging):
         """Provide query API with time ranges parameter.
@@ -171,30 +175,32 @@ class IncreaseCollection(Collection):
     def gen_key_name(self, ts, tagging):
         return '{}:{}'.format(str(ts), tagging)
 
-    def query(self, stime, etime, tagging):
-        rv = self._figure_range_timestamps(stime, etime, tagging)
+    async def query(self, stime, etime, tagging):
+        rv = await self._figure_range_timestamps(stime, etime, tagging)
         if not rv:
             return []
 
         tslist, parameters = rv
         keys = [self.gen_key_name(ts, tagging) for ts in tslist]
-        return zip(keys, self.bk.inc_coll_caches_get(self, *keys), parameters)
+        return zip(keys,
+                   await self.bk.inc_coll_caches_get(self, *keys),
+                   parameters)
 
-    def store(self, ts, tagging, value, abselute_expire=None, expire_from_now=False):
+    async def store(self, ts, tagging, value, abselute_expire=None, expire_from_now=False):
         if not isinstance(value, dict):
             raise ValueError('The IncreaseCollection only accept Dict type value.')
         self.taggings.add(tagging)
         ts, expire = self._figure_ts_and_expire(ts, abselute_expire,
                                                 expire_from_now)
         keyname = self.gen_key_name(ts, tagging)
-        self.bk.set_collection_metadata(self, tagging, expire, ts)
-        self._update_value(keyname, value)
+        await self.bk.set_collection_metadata(self, tagging, expire, ts)
+        await self._update_value(keyname, value)
 
-    def _update_value(self, keyname, inc_value):
+    async def _update_value(self, keyname, inc_value):
         """Using increase method to handle items between value and
         self.caching[key].
         """
-        base = self.bk.inc_coll_caches_get(self, keyname)
+        base = await self.bk.inc_coll_caches_get(self, keyname)
         # print('Store Before `{}` - Origin: {}, Inc: {}'.format(keyname, base,
         #                                                        inc_value))
         if base:
@@ -208,33 +214,37 @@ class IncreaseCollection(Collection):
             base = inc_value
 
         # print('Store After `{}` - {}'.format(keyname, base))
-        self.bk.inc_coll_cache_set(self, keyname, base)
+        await self.bk.inc_coll_cache_set(self, keyname, base)
 
-    def fetch(self, tagging='__all__', d=True, e=True, expired=None):
+    async def fetch(self, tagging='__all__', d=True, e=True, expired=None):
         sentinel = self._figure_expired_sentinel(d, e, expired)
         # figure whole metadatas for all taggings
-        mds = self.bk.query_collection_metadata(self, '__all__', 0, sentinel)
+        mds = await self.bk.query_collection_metadata(self, '__all__',
+                                                      0, sentinel)
         if not mds:
             return []
 
         if tagging == '__all__':
+            rv = []
             for t in self.taggings:
-                yield from self._fetch_expired(mds, sentinel, t, d)
+                rv += list(await self._fetch_expired(mds, sentinel, t, d))
+            return rv
         else:
-            yield from self._fetch_expired(mds, sentinel, tagging, d)
+            return list(await self._fetch_expired(mds, sentinel, tagging, d))
 
-    def _fetch_expired(self, mds, sentinel, tagging, d):
+    async def _fetch_expired(self, mds, sentinel, tagging, d):
         result = self._figure_fetch_exipired_items(mds, sentinel, tagging)
         expire_items, tslist, parameters = result
 
         # construct the keys and fetch the values
         keys = [self.gen_key_name(t, tagging) for t in tslist]
-        rv = self.bk.inc_coll_caches_get(self, *keys)
+        rv = await self.bk.inc_coll_caches_get(self, *keys)
 
         # remove all the expired metadata and the cache items
         if d and rv:
-            self.bk.del_collection_metadata_by_items(self, tagging, expire_items)
-            self.bk.inc_coll_caches_del(self, *keys)
+            await self.bk.del_collection_metadata_by_items(self, tagging,
+                                                           expire_items)
+            await self.bk.inc_coll_caches_del(self, *keys)
 
         return zip(keys, rv, parameters)
 
@@ -254,47 +264,51 @@ class SortedCountCollection(Collection):
     def __str__(self):
         return self.__repl__()
 
-    def query(self, stime, etime, tagging, topN=None):
-        rv = self._figure_range_timestamps(stime, etime, tagging)
+    async def query(self, stime, etime, tagging, topN=None):
+        rv = await self._figure_range_timestamps(stime, etime, tagging)
         if not rv:
             return []
 
         tslist, parameters = rv
         return zip(tslist,
-                   self.bk.sorted_count_coll_cache_get(self, tagging, tslist, topN),
+                   await self.bk.sorted_count_coll_cache_get(self, tagging, tslist, topN),
                    parameters)
 
-    def store(self, ts, tagging, value, abselute_expire=None, expire_from_now=False):
+    async def store(self, ts, tagging, value, abselute_expire=None, expire_from_now=False):
         if not isinstance(value, dict):
             raise ValueError('The IncreaseCollection only accept Dict type value.')
 
         self.taggings.add(tagging)
         ts, expire = self._figure_ts_and_expire(ts, abselute_expire,
                                                 expire_from_now)
-        self.bk.set_collection_metadata(self, tagging, expire, ts)
-        self.bk.sorted_count_coll_cache_set(self, ts, tagging, value)
+        await self.bk.set_collection_metadata(self, tagging, expire, ts)
+        await self.bk.sorted_count_coll_cache_set(self, ts, tagging, value)
 
-    def fetch(self, tagging='__all__', d=True, e=True, expired=None, topN=None):
+    async def fetch(self, tagging='__all__', d=True, e=True, expired=None, topN=None):
         sentinel = self._figure_expired_sentinel(d, e, expired)
         # figure whole metadatas for all taggings
-        mds = self.bk.query_collection_metadata(self, '__all__', 0, sentinel)
+        mds = await self.bk.query_collection_metadata(self, '__all__',
+                                                      0, sentinel)
         if not mds:
             return []
 
         if tagging == '__all__':
+            rv = []
             for t in self.taggings:
-                yield from self._fetch_expired(mds, sentinel, t, d, topN)
+                rv += list(await self._fetch_expired(mds, sentinel, t, d, topN))
+            return rv
         else:
-            yield from self._fetch_expired(mds, sentinel, tagging, d, topN)
+            return await self._fetch_expired(mds, sentinel, tagging, d, topN)
 
-    def _fetch_expired(self, mds, sentinel, tagging, d, topN):
+    async def _fetch_expired(self, mds, sentinel, tagging, d, topN):
         result = self._figure_fetch_exipired_items(mds, sentinel, tagging)
         expire_items, tslist, parameters = result
-        rv = self.bk.sorted_count_coll_cache_get(self, tagging, tslist, topN)
-
+        rv = await self.bk.sorted_count_coll_cache_get(self, tagging,
+                                                       tslist, topN)
         if d and rv:
-            self.bk.del_collection_metadata_by_items(self, tagging, expire_items)
-            self.bk.sorted_count_coll_cache_del(self, tagging, tslist)
+            await self.bk.del_collection_metadata_by_items(self, tagging,
+                                                           expire_items)
+            await self.bk.sorted_count_coll_cache_del(self, tagging, tslist)
 
         return zip(tslist, rv, parameters)
 
@@ -314,43 +328,46 @@ class UniqueCountCollection(Collection):
     def __str__(self):
         return self.__repl__()
 
-    def query(self, stime, etime, tagging):
-        rv = self._figure_range_timestamps(stime, etime, tagging)
+    async def query(self, stime, etime, tagging):
+        rv = await self._figure_range_timestamps(stime, etime, tagging)
         if not rv:
             return []
 
         tslist, parameters = rv
         return zip(tslist,
-                   self.bk.uniq_count_coll_cache_get(self, tagging, tslist),
+                   await self.bk.uniq_count_coll_cache_get(self, tagging, tslist),
                    parameters)
 
-    def store(self, ts, tagging, value, abselute_expire=None, expire_from_now=False):
+    async def store(self, ts, tagging, value, abselute_expire=None, expire_from_now=False):
         self.taggings.add(tagging)
         ts, expire = self._figure_ts_and_expire(ts, abselute_expire,
                                                 expire_from_now)
-        self.bk.set_collection_metadata(self, tagging, expire, ts)
-        self.bk.uniq_count_coll_cache_set(self, ts, tagging, value)
+        await self.bk.set_collection_metadata(self, tagging, expire, ts)
+        await self.bk.uniq_count_coll_cache_set(self, ts, tagging, value)
 
-    def fetch(self, tagging='__all__', d=True, e=True, expired=None):
+    async def fetch(self, tagging='__all__', d=True, e=True, expired=None):
         sentinel = self._figure_expired_sentinel(d, e, expired)
         # figure whole metadatas for all taggings
-        mds = self.bk.query_collection_metadata(self, '__all__', 0, sentinel)
+        mds = await self.bk.query_collection_metadata(self, '__all__', 0, sentinel)
         if not mds:
             return []
 
         if tagging == '__all__':
+            rv = []
             for t in self.taggings:
-                yield from self._fetch_expired(mds, sentinel, t, d)
+                rv += list(await self._fetch_expired(mds, sentinel, t, d))
+            return rv
         else:
-            yield from self._fetch_expired(mds, sentinel, tagging, d)
+            return await self._fetch_expired(mds, sentinel, tagging, d)
 
-    def _fetch_expired(self, mds, sentinel, tagging, d):
+    async def _fetch_expired(self, mds, sentinel, tagging, d):
         result = self._figure_fetch_exipired_items(mds, sentinel, tagging)
         expire_items, tslist, parameters = result
-        rv = self.bk.uniq_count_coll_cache_get(self, tagging, tslist)
+        rv = await self.bk.uniq_count_coll_cache_get(self, tagging, tslist)
 
         if d and rv:
-            self.bk.del_collection_metadata_by_items(self, tagging, expire_items)
-            self.bk.uniq_count_coll_cache_del(self, tagging, tslist)
+            await self.bk.del_collection_metadata_by_items(self, tagging,
+                                                           expire_items)
+            await self.bk.uniq_count_coll_cache_del(self, tagging, tslist)
 
         return zip(tslist, rv, parameters)

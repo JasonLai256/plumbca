@@ -462,6 +462,8 @@ class AioRedisBackend(RedisBackend):
 
         :param items: the items query from metadata, structure should be equal
                       to the format of the metadata query that specified tagging.
+
+        :TODO: add unittest case for the method!
         """
         md_key = self.metadata_fmt.format(name=coll.name)
         await self._del_collection_metadata(md_key, tagging, items)
@@ -481,6 +483,7 @@ class AioRedisBackend(RedisBackend):
     async def _del_collection_metadata(self, key, tagging, elements):
         del_info_todos = []
         del_key_todos = []
+        # know that there is `(member, score) pair`
         elements = [(elements[i], elements[i+1])
                     for i in range(0, len(elements), 2)]
 
@@ -566,6 +569,7 @@ class AioRedisBackend(RedisBackend):
         if not elements:
             return
         else:
+            # know that there is `(member, score) pair`
             elements = [(elements[i], elements[i+1])
                         for i in range(0, len(elements), 2)]
 
@@ -677,7 +681,7 @@ class AioRedisBackend(RedisBackend):
                 elements = await self.rdb.zrange(key, -topN, -1, withscores=True)
             else:
                 elements = await self.rdb.zrange(key, 0, -1, withscores=True)
-            # there is `(member, score) pair`
+            # know that there is `(member, score) pair`
             elements = [(unpackb(elements[i]), elements[i+1])
                         for i in range(0, len(elements), 2)]
             rv.append(elements)

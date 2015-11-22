@@ -72,7 +72,7 @@ def test_redis_backend_metadata(loop, arb, fake_coll):
         t = taggings[-1]
         # delete one tagging info in first ts
         await arb.del_collection_metadata_by_range(fake_coll, taggings[0],
-                                                       first_ts, first_ts)
+                                                   first_ts, first_ts)
         rv = await arb.query_collection_metadata(fake_coll, t, 0, 1000)
         assert len(rv) == len(ts_pairs)
         rv = await arb.query_collection_metadata_tagging(fake_coll, 0, 1000)
