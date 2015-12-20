@@ -63,7 +63,7 @@ class NewRequest(object):
     """
     def __init__(self, raw_message):
         _command, _message = raw_message.strip().split()
-        print(_command, _message)
+        # print(_command, _message)
         self.command = frame2str(_command)
         self._message = unpackb(_message)
 

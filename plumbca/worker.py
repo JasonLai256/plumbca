@@ -12,9 +12,6 @@
 import traceback
 import logging
 import time
-from threading import Thread
-
-import zmq
 
 from .collection import IncreaseCollection
 from .cache import CacheCtl
@@ -27,46 +24,30 @@ actlog = logging.getLogger('activity')
 errlog = logging.getLogger('errors')
 
 
-class Worker(Thread):
+class Worker:
     """
     Class that handles commands server side.
     Translates, messages commands to it's methods calls.
     """
     def __init__(self):
-        self.sock = constants.ZCONTEXT.socket(zmq.DEALER)
-        super().__init__()
+        pass
 
     def __del__(self):
         self.sock.close()
 
-    def run(self):
-        time.sleep(1)
-        self.sock.connect(constants.BACKEND_IPC)
-        actlog.info('<WORKER> socket connect to %s', constants.BACKEND_IPC)
+    async def run_command(self, req):
+        try:
+            func = getattr(self, req.command)
+            response = func(*req.args)
+        except Exception as err:
+            error_track = traceback.format_exc()
+            errmsg = '%s\n%s' % (err, error_track)
+            errmsg = '<WORKER> Unknown situation occur: %s' % errmsg
+            errlog.error(errmsg)
 
-        # register service
-        actlog.info('<WORKER> try to register worker service.')
-        self.sock.send_multipart([b'register_service', b'worker', b'READY'])
-        poller = zmq.Poller()
-        poller.register(self.sock, zmq.POLLIN)
-        actlog.info('<WORKER> starting the worker service ...')
-        while True:
-            try:
-                poller.poll()
-                msg = self.sock.recv_multipart(copy=False)
-                req = Request(msg)
-                func = getattr(self, req.command)
-                response = func(*req.args)
-                self.sock.send_multipart([req.addr, response])
-            except Exception as err:
-                error_track = traceback.format_exc()
-                errmsg = '%s\n%s' % (err, error_track)
-                errmsg = '<WORKER> Unknown situation occur: %s' % errmsg
-                errlog.error(errmsg)
-
-                response = Response(datas=errmsg,
-                                    status=message_process_failure)
-                self.sock.send_multipart([req.addr, response])
+            response = Response(datas=errmsg,
+                                status=message_process_failure)
+        return response
 
     def wping(self):
         actlog.info('<WORKER> handling Wping command ...')
