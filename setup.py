@@ -8,9 +8,9 @@ setup(
     name='plumbca',
     version=__version__,
     install_requires=[
-        'pyzmq',
+        # 'pyzmq',
         'msgpack-python',
-        'redis',
+        'asyncio_redis',
     ],
     scripts=['bin/plumbca-server'],
     packages=find_packages(exclude=["tests"]),
