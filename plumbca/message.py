@@ -27,33 +27,6 @@ class Request(object):
     """Handler objects for client requests messages
 
     Frame Format:
-    [req_addr, command, Message]
-
-    Message:
-    {
-        'args': [...],
-    }
-    """
-    def __init__(self, raw_message):
-        self.addr = raw_message[0]
-        self.command = frame2str(raw_message[1])
-        self._message = unpackb(raw_message[2])
-
-        actlog.debug('<Request %s - %s>', self.command, self._message)
-        # __getitem__ will raise if key not exists
-        if 'args' in self._message:
-            self.args = self._message['args']
-        elif b'args' in self._message:
-            self.args = self._message[b'args']
-        else:
-            errlog.exception("Invalid request message : ", raw_message)
-            raise MessageFormatError("Invalid request message : %r" % raw_message)
-
-
-class NewRequest(object):
-    """Handler objects for client requests messages
-
-    Frame Format:
         'command Message'
 
     Message:

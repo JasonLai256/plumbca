@@ -32,13 +32,10 @@ class Worker:
     def __init__(self):
         pass
 
-    def __del__(self):
-        self.sock.close()
-
     async def run_command(self, req):
         try:
             func = getattr(self, req.command)
-            response = func(*req.args)
+            response = await func(*req.args)
         except Exception as err:
             error_track = traceback.format_exc()
             errmsg = '%s\n%s' % (err, error_track)
@@ -49,11 +46,11 @@ class Worker:
                                 status=message_process_failure)
         return response
 
-    def wping(self):
+    async def wping(self):
         actlog.info('<WORKER> handling Wping command ...')
         return Response(datas='WORKER OK')
 
-    def dump(self):
+    async def dump(self):
         """
         Handles Dumps message command.
         Executes dump operation for all of the collections in CacheCtl.
@@ -113,7 +110,7 @@ class Worker:
         rv = list(rv) if rv else []
         return Response(datas=rv)
 
-    def get_collections(self):
+    async def get_collections(self):
         """
         """
         actlog.info('<WORKER> handling Get_collections command ...')
@@ -121,7 +118,7 @@ class Worker:
         return Response(datas=rv)
 
     async def ensure_collection(self, name, coll_type='IncreaseCollection',
-                          expired=3600):
+                                expired=3600):
         actlog.info('<WORKER> handling ENSURE_COLLECTION command - %s, %s, %s ...',
                     name, coll_type, expired)
         await CacheCtl.ensure_collection(name, coll_type, expired)

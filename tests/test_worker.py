@@ -24,7 +24,7 @@ def test_worker_basic(loop, arb, coll_list):
         for coll in coll_list:
             await worker.ensure_collection(coll, expired=7200)
             await worker.store(coll, 123, tag, val)
-        r = unpackb(worker.get_collections())
+        r = unpackb(await worker.get_collections())
         assert r['headers']['status'] == message_process_success
         assert sorted(r['datas']) == sorted(coll_list)
 
