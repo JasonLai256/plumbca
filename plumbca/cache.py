@@ -9,6 +9,7 @@
     :license: BSD, see LICENSE for more details.
 """
 
+import asyncio
 import logging
 import re
 import os
@@ -28,6 +29,8 @@ class CacheCtl(object):
         self.collmap = {}
         self.info = {}
         self.bk = BackendFactory(DefaultConf['backend'])
+        loop = asyncio.get_event_loop()
+        loop.run_until_complete(self.bk.init_connection())
 
     def get_collection(self, name):
         if name not in self.collmap:
@@ -40,12 +43,14 @@ class CacheCtl(object):
         rv = await self.bk.get_collection_index(name)
 
         if name not in self.collmap and not rv:
+            actlog.info("Ensure collection - not exists in plumbca and redis")
             self.collmap[name] = globals()[ctype](name, expire=expire, **kwargs)
             await self.bk.set_collection_index(name, self.collmap[name])
             actlog.info("Ensure collection - not exists in plumbca and redis, "
                         "create it, `%s`.", self.collmap[name])
 
         elif name not in self.collmap and rv:
+            actlog.info("Ensure collection - not exists in plumbca")
             rv_name, rv_instance_name = rv
             assert name == rv_name
             assert rv_instance_name == globals()[ctype].__class__.__name__
@@ -54,6 +59,7 @@ class CacheCtl(object):
                         "create it, `%s`.", self.collmap[name])
 
         elif name in self.collmap and not rv:
+            actlog.info("Ensure collection - not exists in redis")
             await self.bk.set_collection_index(name, self.collmap[name])
             actlog.info("Ensure collection - not exists in redis, "
                         "create it, `%s`.", self.collmap[name])

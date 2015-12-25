@@ -20,7 +20,7 @@ aclog = logging.getLogger('activity')
 errlog = logging.getLogger('errors')
 
 
-def main():
+def runserver():
     loop = asyncio.get_event_loop()
     pcp = PlumbcaCmdProtocol()
     coro = asyncio.start_server(pcp.plumbca_cmd_handle, DefaultConf['bind'],

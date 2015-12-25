@@ -35,7 +35,8 @@ class Request(object):
     }
     """
     def __init__(self, raw_message):
-        _command, _message = raw_message.strip().split()
+        _command, _message = raw_message.strip().split(b' ', 1)
+
         # print(_command, _message)
         self.command = frame2str(_command)
         self._message = unpackb(_message)

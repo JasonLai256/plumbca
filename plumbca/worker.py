@@ -50,6 +50,10 @@ class Worker:
         actlog.info('<WORKER> handling Wping command ...')
         return Response(datas='WORKER OK')
 
+    async def ping(self):
+        actlog.info('<WORKER> handling Ping command ...')
+        return Response(datas='SERVER OK')
+
     async def dump(self):
         """
         Handles Dumps message command.
@@ -70,10 +74,10 @@ class Worker:
         value        =>     Data value
         expire       =>     Data expiring time
         """
-        wrtlog.info('<WORKER> handling Store command - %s, %s ... %s ...',
-                    collection, args[:2], len(args[2]))
         coll = CacheCtl.get_collection(collection)
         await coll.store(*args, **kwargs)
+        wrtlog.info('<WORKER> handling Store command - %s, %s ... %s ...',
+                    collection, args[:2], len(args[2]))
         return Response(datas='Store OK')
 
     async def query(self, collection, *args, **kwargs):
@@ -86,11 +90,11 @@ class Worker:
         end_time     =>     The end time of the query
         tagging      =>     The tagging of the data
         """
-        actlog.info('<WORKER> handling Query command - %s, %s ...',
-                    collection, args)
         coll = CacheCtl.get_collection(collection)
         rv = await coll.query(*args, **kwargs)
         rv = list(rv) if rv else []
+        actlog.info('<WORKER> handling Query command - %s, %s ...',
+                    collection, args)
         return Response(datas=rv)
 
     async def fetch(self, collection, *args, **kwargs):
@@ -103,26 +107,26 @@ class Worker:
         d            =>      Should be delete the fetching data
         e            =>      whether only contain the expired data
         """
-        actlog.info('<WORKER> handling Fetch command - %s, %s ...',
-                    collection, args)
         coll = CacheCtl.get_collection(collection)
         rv = await coll.fetch(*args, **kwargs)
         rv = list(rv) if rv else []
+        actlog.info('<WORKER> handling Fetch command - %s, %s ...',
+                    collection, args)
         return Response(datas=rv)
 
     async def get_collections(self):
         """
         """
-        actlog.info('<WORKER> handling Get_collections command ...')
         rv = list(CacheCtl.collmap.keys())
+        actlog.info('<WORKER> handling Get_collections command ...')
         return Response(datas=rv)
 
     async def ensure_collection(self, name, coll_type='IncreaseCollection',
                                 expired=3600):
-        actlog.info('<WORKER> handling ENSURE_COLLECTION command - %s, %s, %s ...',
-                    name, coll_type, expired)
         await CacheCtl.ensure_collection(name, coll_type, expired)
         assert name in CacheCtl.collmap
+        actlog.info('<WORKER> handling ENSURE_COLLECTION command - %s, %s, %s ...',
+                    name, coll_type, expired)
         return Response(datas='Ensure OK')
 
     def _gen_response(self, request, cmd_status, cmd_value):

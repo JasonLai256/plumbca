@@ -10,6 +10,7 @@
 """
 
 import logging
+import struct
 import asyncio
 
 from .message import Request
@@ -30,16 +31,17 @@ class PlumbcaCmdProtocol:
 
         plumbca_cmd_handle handles incoming command request.
         """
-        data = await reader.read()
+        data = await reader.readline()
+
         req = Request(data)
         addr = writer.get_extra_info('peername')
         actlog.info("<Server> Received %r from %r", req.command, addr)
 
         # drive the command process
-        resp = self.handler.run_command(req)
+        resp = await self.handler.run_command(req)
 
-        writer.write(req.args)
+        writer.write(resp)
         await writer.drain()
 
-        actlog.info("Close the client %r socket", addr)
+        # actlog.info("Close the client %r socket", addr)
         writer.close()
